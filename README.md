@@ -1,65 +1,73 @@
 # Đảo Đèn Lồng
 
-Game 3D phiêu lưu cổ tích (Three.js) — Lab Day 12 AI SDLC · **Phase 3 (TICKET-03 "Đèn cạn dầu")** · MSSV `2A202603479` · Phạm Trung Kiên
+Game 3D cổ tích (Three.js) — VinUni Day 12 AI SDLC · **v1.0.0 / Phase 4** · MSSV `2A202603479` · Phạm Trung Kiên
 
-## Cài đặt & chạy (Windows PowerShell)
+![Screenshot placeholder](docs/demo/screenshot-placeholder.svg)
+
+> Ảnh/GIF thật: chạy `npm run dev`, chụp màn hình và thay file trên (hoặc thêm `docs/demo/demo.gif`).
+
+## Yêu cầu hệ thống
+
+- Node.js ≥ 20
+- GPU hỗ trợ WebGL (Chrome/Edge khuyến nghị)
+- Windows / macOS / Linux
+- Benchmark cần Chromium (Playwright tự cài lần đầu)
+
+## Cài đặt (≤ 3 lệnh)
 
 ```powershell
 npm install
+npx playwright install chromium
 npm run dev
 ```
 
 Mở URL Vite (mặc định `http://localhost:5173`).
 
+Build tĩnh:
+
 ```powershell
 npm run build
-npm test
+npm run preview
 ```
 
-## Headless (Test Contract v1.2)
+Thư mục `dist/` là bản web chạy được (đính kèm Release).
 
-```powershell
-node src/headless/cli.js --seed 1 --night 1 --ticks 60 --out out_n1.jsonl --snapshot-every 10
-node src/headless/cli.js --seed 1 --night 1 --scenario tests/scenarios/p3_dawn_win.json --ticks 90 --out dawn_win.jsonl
-node src/headless/cli.js --seed 1 --night 1 --scenario tests/scenarios/p3_shade_drain.json --ticks 120 --out drain.jsonl
-node src/headless/cli.js --seed 123 --night 3 --ticks 21600 --out bench_n3.jsonl --snapshot-every 600
-```
-
-## 3 Hòn Đảo
-
-1. **Đêm 1 · Đảo Bến** (240s · 5 đèn · cần ≥3 sáng tới bình minh).
-2. **Đêm 2 · Đảo Cau** (270s · 6 đèn · ≥4) — cầu tre, Gió Lạc, Bùa Gió.
-3. **Đêm 3 · Đảo Chuông** (300s · 7 đèn · ≥5) — 3 tầng, Tháp Chuông, gió mạnh.
-
-Đèn **cạn dầu** (1 fuel/s). Thắp lần đầu cần 10 đom đóm; thắp lại 5; đổ dầu khi đang cháy. Bóng Mực hút dầu đèn yếu (<30). Vùng an toàn chỉ khi fuel ≥ 30.
-
-## Điều khiển
+## Điều khiển (mặc định — đổi được trong Cài đặt)
 
 | Phím | Hành động |
 |---|---|
-| `WASD` | Di chuyển |
-| Chuột | Xoay camera (click khóa) |
-| `Space` | Nhảy |
-| `Shift` | Lướt |
-| `E` | Thắp / thắp lại / đổ dầu |
-| `Q` | Tỏa sáng (3 đom đóm) |
-| `Esc` / `P` | Tạm dừng |
+| WASD | Di chuyển |
+| Chuột | Xoay camera |
+| Space | Nhảy |
+| Shift | Lướt |
+| E | Thắp / đổ dầu |
+| Q | Tỏa sáng |
+| Esc / P | Tạm dừng |
 
-Cài đặt: **Bảng màu dễ phân biệt** (shade `#00B3FF`, cảnh báo trắng + ⚠).
+Accessibility: đổi phím, giảm chuyển động, chữ lớn ×1.25, bảng màu dễ phân biệt, phụ đề ⚠.
 
-## Điểm (v1.2)
+## Test / Headless / Bench / Soak
 
-- `+5` mỗi đom đóm nạp/đổ dầu
-- `+100` thắp lần đầu · `+40` thắp lại
-- `+5` Pulse thường · `+15` Pulse khi Shade đang/ vừa drain
-- Thắng bình minh: mỗi đèn sáng `+50 + ⌊fuel⌋` · mỗi Ngọn Lửa `+50`
-- Không cộng điểm theo thời gian còn lại
+```powershell
+npm test
+node src/headless/cli.js --seed 1 --night 1 --ticks 60 --out out.jsonl --snapshot-every 10
+node src/bench/cli.js --seed 42 --duration 30 --out bench.json
+node src/soak/cli.js --seed 7 --nights 10 --out soak.json
+node src/run.js --export-leaderboard out-lb.json
+```
 
-Sức chứa đom đóm: `min(20, 10 + 2 × số lần thắp thành công)`.
+**Benchmark:** cửa sổ 1280×720, tắt vsync qua cờ Chromium (`--disable-gpu-vsync`, `--disable-frame-rate-limit`). Nếu GPU/driver vẫn ép vsync, ghi nhận trong `bench.json.vsync_off` và README này.
+
+**Soak:** 10 đêm headless, random input theo seed; cần `crashes=0` và `mem_end_mb ≤ 1.2 × mem_start_mb`.
+
+## Contract
+
+`game.contract.json` · `contract_version: "1.3"`  
+`run_cmd` / `bench_cmd` / `soak_cmd` / `headless_cmd` như trên.
 
 ## Tài liệu
 
-- `AGENTS.md` · `game.contract.json` (v1.2)
-- ADR: `docs/adr/ADR-003-lantern-fuel-and-dawn.md`
-- Evidence: `docs/phase-3-evidence.md` · `docs/proof/phase-3/`
-- `CHANGELOG.md` · `docs/notes/ai-log.md`
+- `CHANGELOG.md` · `CREDITS.md` · `LICENSE`
+- Retro: `docs/retro/phase-4-retro.md`
+- Evidence: `docs/phase-4-evidence.md`, `bench.json`, `soak.json`
+- Demo video (nộp bài): `docs/demo/demo.mp4` (quay thủ công < 5 phút)

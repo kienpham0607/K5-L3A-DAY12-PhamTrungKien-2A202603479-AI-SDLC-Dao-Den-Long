@@ -122,9 +122,30 @@ export function updateShades(world, tuning = TUNING) {
 
     // --- wander ---
     if (s.state === 'wander') {
-      if (playerTargetable && distToPlayer <= detectR) {
+      // Bench: keep pure wander (no chase / drain targeting)
+      if (!world.benchMode && playerTargetable && distToPlayer <= detectR) {
         s.state = 'chase';
         s.targetLanternId = null;
+        continue;
+      }
+
+      if (world.benchMode) {
+        s.wanderTimer = (s.wanderTimer ?? 0) - 1;
+        if (s.wanderTimer <= 0) {
+          s.wanderAngle = world.rng() * Math.PI * 2;
+          s.wanderTimer = 60 + Math.floor(world.rng() * 90);
+        }
+        const stepDist = speed * 0.45 * dt;
+        const nx = s.pos[0] + Math.cos(s.wanderAngle) * stepDist;
+        const nz = s.pos[2] + Math.sin(s.wanderAngle) * stepDist;
+        const surf = getSurfaceHeight(world.level, nx, nz, s.pos[1] + 3);
+        if (surf !== null) {
+          s.pos[0] = nx;
+          s.pos[1] = surf;
+          s.pos[2] = nz;
+        } else {
+          s.wanderAngle += Math.PI * 0.75;
+        }
         continue;
       }
 

@@ -7,10 +7,13 @@ import { contractTuning, TUNING } from '../../src/shared/tuning.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
-describe('tuning sync with game.contract.json (Contract v1.2)', () => {
-  it('matches contract tuning object and v1.2 version', () => {
+describe('tuning sync with game.contract.json (Contract v1.3)', () => {
+  it('matches contract tuning object and v1.3 version + bench/soak cmds', () => {
     const contract = JSON.parse(readFileSync(join(root, 'game.contract.json'), 'utf8'));
-    assert.equal(contract.contract_version, '1.2');
+    assert.equal(contract.contract_version, '1.3');
+    assert.equal(contract.bench_cmd, 'node src/bench/cli.js');
+    assert.equal(contract.soak_cmd, 'node src/soak/cli.js');
+    assert.equal(contract.run_cmd, 'node src/run.js');
     assert.equal(contract.tuning.fuel_max, 100);
     assert.equal(contract.tuning.fuel_decay_per_s, 1.0);
     assert.equal(contract.tuning.fuel_per_mote, 10);

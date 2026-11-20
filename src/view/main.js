@@ -25,12 +25,14 @@ document.body.appendChild(canvas);
 let settings = loadSettings();
 const audio = createAudio(settings);
 const sceneView = createScene(canvas);
-const input = createInput(settings.mouseSensitivity);
+const input = createInput(settings.mouseSensitivity, settings.keybinds);
 
-let screen = 'menu'; // 'menu' | 'intro' | 'playing' | 'pause' | 'settings' | 'result'
+let screen = 'menu';
 let settingsReturnTo = 'menu';
 let currentNight = 1;
 let totalScore = 0;
+let nightsWon = 0;
+let runSeed = 1;
 let world = bootWorld(1, 1);
 let acc = 0;
 let last = performance.now();
@@ -38,11 +40,21 @@ let lastCountdownSec = 11;
 let prevWindWarn = false;
 let lastGameOverReason = null;
 
+function applySettings(next) {
+  settings = next;
+  saveSettings(settings);
+  audio.updateSettings(settings);
+  input.setSensitivity(settings.mouseSensitivity);
+  input.setKeybinds(settings.keybinds || {});
+  sceneView.setColorblind(settings.colorblindPalette);
+  sceneView.setReduceMotion?.(settings.reduceMotion);
+}
+
 function safePointerLock() {
   try {
     Promise.resolve(canvas.requestPointerLock?.()).catch(() => {});
   } catch {
-    // Ignore pointer lock errors in restricted contexts
+    // ignore
   }
 }
 
@@ -53,6 +65,7 @@ function showResultScreen() {
     world,
     totalScore,
     reason: lastGameOverReason,
+    nightsWon,
   });
 }
 
@@ -60,8 +73,12 @@ const hud = createHud(settings, {
   onSelectNight(night) {
     audio.unlock();
     currentNight = night;
-    if (night === 1) totalScore = 0;
-    world = bootWorld(night, (Date.now() % 100000) + night);
+    if (night === 1) {
+      totalScore = 0;
+      nightsWon = 0;
+    }
+    runSeed = (Date.now() % 100000) + night;
+    world = bootWorld(night, runSeed);
     input.resetYaw(world.level.spawnYawDeg ?? 0);
     hud.reset();
     lastCountdownSec = 11;
@@ -86,7 +103,8 @@ const hud = createHud(settings, {
   },
   onRestartNight() {
     audio.unlock();
-    world = bootWorld(currentNight, (Date.now() % 100000) + currentNight);
+    runSeed = (Date.now() % 100000) + currentNight;
+    world = bootWorld(currentNight, runSeed);
     input.resetYaw(world.level.spawnYawDeg ?? 0);
     hud.reset();
     acc = 0;
@@ -101,7 +119,8 @@ const hud = createHud(settings, {
     audio.unlock();
     const next = Math.min(3, currentNight + 1);
     currentNight = next;
-    world = bootWorld(next, (Date.now() % 100000) + next);
+    runSeed = (Date.now() % 100000) + next;
+    world = bootWorld(next, runSeed);
     input.resetYaw(world.level.spawnYawDeg ?? 0);
     hud.reset();
     acc = 0;
@@ -121,11 +140,11 @@ const hud = createHud(settings, {
     hud.setScreen(screen);
   },
   onSettingsChange(next) {
-    settings = next;
-    saveSettings(settings);
-    audio.updateSettings(settings);
-    input.setSensitivity(settings.mouseSensitivity);
-    sceneView.setColorblind(settings.colorblindPalette);
+    applySettings(next);
+  },
+  onOpenLeaderboard() {
+    screen = 'leaderboard';
+    hud.setScreen('leaderboard');
   },
   onMainMenu() {
     if (document.pointerLockElement) document.exitPointerLock();
@@ -135,17 +154,15 @@ const hud = createHud(settings, {
 });
 
 input.requestPointerLock(canvas, () => screen === 'playing');
-sceneView.setColorblind(settings.colorblindPalette);
+applySettings(settings);
 hud.setScreen('menu');
 
-// Unlock audio on first gesture anywhere
 window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  // Handle Esc/P pause toggle cleanly (ignore while result is showing)
   if (input.consumePause()) {
     if (screen === 'playing' && world.state === 'playing') {
       world.paused = true;
@@ -160,6 +177,9 @@ function frame(now) {
     } else if (screen === 'settings') {
       screen = settingsReturnTo;
       hud.setScreen(screen);
+    } else if (screen === 'leaderboard') {
+      screen = 'menu';
+      hud.setScreen('menu');
     }
   }
 
@@ -178,18 +198,15 @@ function frame(now) {
       acc -= 1 / TICK_HZ;
     }
 
-    // Jump SFX when leaving ground via jump
     if (wasGrounded && !world.player.grounded && world.player.vel[1] > 4) {
       audio.play('jump');
     }
 
-    // Wind warning SFX
     if (world.wind?.warning && !prevWindWarn) {
       audio.play('wind_warn');
     }
     prevWindWarn = Boolean(world.wind?.warning);
 
-    // Last 10s countdown tick SFX
     const remS = Math.ceil(Math.max(0, timeLeft(world)));
     if (remS <= 10 && remS > 0 && remS < lastCountdownSec) {
       audio.play('countdown');
@@ -213,6 +230,7 @@ function frame(now) {
           lastGameOverReason = ev.data.reason;
           if (ev.data.result === 'won') {
             totalScore += world.score;
+            nightsWon = Math.max(nightsWon, world.night);
             audio.play('won');
           } else {
             audio.play('lost');
@@ -222,18 +240,17 @@ function frame(now) {
     }
   }
 
-  // Always surface win/lose UI when sim ends (even if paused mid-transition)
   if (
     (world.state === 'won' || world.state === 'lost') &&
     screen !== 'result' &&
-    screen !== 'menu'
+    screen !== 'menu' &&
+    screen !== 'leaderboard'
   ) {
     showResultScreen();
   }
 
   sceneView.sync(world, dt);
-  if (screen === 'menu' || screen === 'intro') {
-    // Gentle scenic camera orbit in menus
+  if (screen === 'menu' || screen === 'intro' || screen === 'leaderboard') {
     const orbitYaw = (now * 0.008) % 360;
     sceneView.updateCamera(world, orbitYaw, dt);
   } else {
@@ -241,7 +258,11 @@ function frame(now) {
   }
 
   if (screen === 'playing' || screen === 'pause') {
-    const offscreen = screen === 'playing' ? sceneView.getOffscreenLanternIndicator(world) : null;
+    let offscreen = null;
+    if (screen === 'playing') {
+      offscreen = sceneView.getOffscreenShadeIndicator(world)
+        || sceneView.getOffscreenLanternIndicator(world);
+    }
     hud.update(world, timeLeft(world), sample.cam_yaw_deg, dt, offscreen);
   }
 

@@ -165,6 +165,15 @@
 | AI sai? | Không phát hiện trong bước này. PowerShell redirect stderr ồn — dùng spawn Node để ghi proof sạch |
 | Chưa làm (đúng scope) | Movement, pickup, deposit, shades, pulse, win/lose gameplay, Three.js view |
 
+## Session 13 — Phase 4 TICKET-04 v1.0.0 (Contract v1.3)
+
+| Mục | Nội dung |
+|---|---|
+| Mục tiêu | Bench, soak, leaderboard, a11y, release docs, tag phase-4 |
+| Chạy thật | `npm test` **87 pass**; build OK; soak crashes=0; bench avg_fps=165 |
+| Artifacts | `bench.json`, `soak.json`, `docs/phase-4-evidence.md`, retro |
+| AI sai? | FPS ảo khi `--disable-frame-rate-limit` → bỏ cờ đó |
+
 ## Session 12 — Phase 3 TICKET-03 "Đèn cạn dầu" (Contract v1.2)
 
 | Mục | Nội dung |

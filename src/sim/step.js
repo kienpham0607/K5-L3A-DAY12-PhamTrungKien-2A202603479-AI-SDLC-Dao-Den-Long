@@ -45,23 +45,12 @@ function advanceTimers(world, tuning) {
     }
   }
 
-  updateWind(world, tuning);
+  if (!world.benchMode) updateWind(world, tuning);
 }
 
 /**
- * Exact tick order (TICKET-02 + Phase 3 fuel):
- * 1. Pause toggle
- * 2. Countdown & timers + fuel decay + shade drain + extinguish
- * 3. Movement
- * 4. Pickup
- * 5. Deposit / refuel / relight
- * 6. Safe zones (fuel >= 30)
- * 7. Pulse
- * 8. Enemy AI (shades + drain transitions + drifters)
- * 9. Collision
- * 10. Spawn
- * 11. Win/Lose (no_flames > dawn_survived/dawn)
- * 12. Snapshot (caller)
+ * Exact tick order (TICKET-02 + Phase 3 fuel + Phase 4 benchMode):
+ * Bench: only timers (no fuel) + shade wander; no spawn/damage/pickup/win.
  */
 export function step(world, input, tuning = TUNING) {
   const events = [];
@@ -71,7 +60,7 @@ export function step(world, input, tuning = TUNING) {
   world.tick += 1;
 
   const pauseEdge = Boolean(input?.pause) && !Boolean(prevInput?.pause);
-  if (pauseEdge && world.state === 'playing') {
+  if (pauseEdge && world.state === 'playing' && !world.benchMode) {
     world.paused = !world.paused;
     events.push({
       type: 'event',
@@ -91,6 +80,16 @@ export function step(world, input, tuning = TUNING) {
   };
 
   if (world.paused || world.state !== 'playing') {
+    for (const ev of events) ev.tick = world.tick;
+    return { events };
+  }
+
+  // --- Benchmark: shades wander only; player frozen ---
+  if (world.benchMode) {
+    world.stepsDone += 1;
+    world.player.pos = [0, 0, 0];
+    world.player.vel = [0, 0, 0];
+    updateShades(world, tuning);
     for (const ev of events) ev.tick = world.tick;
     return { events };
   }

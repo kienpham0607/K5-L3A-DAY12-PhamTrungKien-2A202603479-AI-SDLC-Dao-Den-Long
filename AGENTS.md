@@ -1,42 +1,35 @@
-# AGENTS.md — Đảo Đèn Lồng (Phase 3 — TICKET-03 "Đèn cạn dầu")
+# AGENTS.md — Đảo Đèn Lồng (Phase 4 — v1.0.0 / Contract v1.3)
 
 ## Scope
 
-- **Phase 3 (TICKET-03 + Test Contract v1.2)** xây trên Phase 1–2 (`docs/prd/PRD-0.md`, `docs/adr/ADR-003-lantern-fuel-and-dawn.md`).
-- 3 đêm dùng chung engine; đèn có nhiên liệu, Bóng Mực hút dầu, thắng bằng sống đến bình minh (≥60% đèn sáng).
-- Không giả mạo test, benchmark hay bằng chứng.
-
-## Stack
-
-- JavaScript (ES Modules) + Vite + Three.js (view) + Web Audio API
-- Sim thuần JS trong `src/sim/**` (KHÔNG import `three` / DOM / Canvas)
-- Headless CLI: `node src/headless/cli.js --seed <int> --night <1|2|3> ...`
+- Phase 4: benchmark, soak, leaderboard, accessibility, release packaging.
+- Giữ nguyên luật Phase 1–3 (fuel, dawn, 3 đảo). Headless output không đổi trừ contract mở rộng.
+- Không giả mạo bench/soak/test.
 
 ## Commands (Windows PowerShell)
 
 ```powershell
 npm install
+npx playwright install chromium
 npm run build
 npm run dev
 npm test
-node src/headless/cli.js --seed 1 --night 1 --ticks 60 --out out.jsonl --snapshot-every 10
-node src/headless/cli.js --seed 1 --night 1 --scenario tests/scenarios/p3_dawn_win.json --ticks 90 --out dawn.jsonl
-node src/headless/cli.js --seed 123 --night 3 --ticks 21600 --out bench_n3.jsonl --snapshot-every 600
+node src/headless/cli.js --seed 1 --night 1 --ticks 60 --out out.jsonl
+node src/bench/cli.js --seed 42 --duration 30 --out bench.json
+node src/soak/cli.js --seed 7 --nights 10 --out soak.json
+node src/run.js --export-leaderboard out-lb.json
 ```
 
-## Architecture rules
+## Architecture
 
-1. Luật chơi / AI nằm trong `src/sim/**`.
-2. `src/shared/levels.js` là single source of truth cho sim + view.
-3. `src/shared/tuning.js` khớp `game.contract.json` (`contract_version: "1.2"`).
-4. Fixed timestep 60 Hz; fuel decay + shade drain ở step 2; win/lose ở step 11.
-5. Determinism: không `Math.random()` trong `src/sim/**` — chỉ seeded PRNG.
-6. Pause: `tick` tăng, `sim_tick` và timer gameplay dừng.
-7. Fuel nội bộ integer (`fuelUnits = display * 60`); snapshot làm tròn 1 chữ số thập phân.
+1. Sim thuần trong `src/sim/**` (không Three/DOM).
+2. `benchMode` trên world: chỉ wander shades; tắt spawn/damage/pickup/fuel/win.
+3. `src/shared/levels.js` + `tuning.js` khớp `game.contract.json` v1.3.
+4. Leaderboard: localStorage + file `leaderboard.json` / `~/.dao-den-long/` qua Vite middleware.
 
 ## Definition of done
 
-- `npm test` pass 100% (Phase 1–3 + determinism + benchmark ≤ 30s / 21.600 tick).
-- `npm run build` thành công.
-- Bằng chứng tại `docs/proof/phase-3/` và `docs/phase-3-evidence.md`.
-- Cập nhật `docs/notes/ai-log.md`, `README.md`, `CHANGELOG.md`.
+- `npm test` 100% pass · `npm run build` OK
+- `bench.json` + `soak.json` tự chạy, commit vào repo
+- Tag `phase-4` + Release `v1.0.0` (đính `dist/`)
+- Docs: README, CHANGELOG (4 phase), CREDITS, LICENSE, retro, evidence

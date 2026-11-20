@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.3",
+  "avg_fps": 165,
+  "p1_low_fps": 158.2,
+  "frame_ms_p95": 6.2,
+  "frames": 4952,
+  "load_ms": 54,
+  "peak_mem_mb": 8,
+  "peak_mem_note": "Chrome performance.memory (JS heap), not full process RSS",
+  "vsync_off": true,
+  "renderer": "Three.js r170 WebGLRenderer (bench instanced shades)",
+  "os": "win32 10.0.26200",
+  "seed": 42,
+  "duration_s": 30,
+  "entities": {
+    "shades": 200,
+    "motes": 100
+  }
+}

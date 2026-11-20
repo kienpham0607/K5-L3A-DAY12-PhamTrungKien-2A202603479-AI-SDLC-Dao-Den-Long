@@ -1,5 +1,10 @@
 import { TUNING } from '../shared/tuning.js';
 import { TICK_HZ } from '../shared/constants.js';
+import {
+  DEFAULT_KEYBINDS,
+  findKeybindConflicts,
+} from './settings.js';
+import { fetchLeaderboard, submitScore, validateName } from './leaderboardClient.js';
 
 function formatClock(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
@@ -101,6 +106,7 @@ export function createHud(initialSettings, callbacks) {
           <button type="button" class="btn" data-night="2">Đêm 2 · Đảo Cau</button>
           <button type="button" class="btn" data-night="3">Đêm 3 · Đảo Chuông</button>
         </div>
+        <button type="button" class="btn" id="btn-menu-leaderboard">Bảng xếp hạng</button>
         <button type="button" class="btn" id="btn-menu-settings">Cài đặt</button>
       </div>
     </div>
@@ -185,6 +191,23 @@ export function createHud(initialSettings, callbacks) {
             <input type="checkbox" id="set-colorblind" />
           </label>
         </div>
+        <div class="setting-item setting-check">
+          <label>
+            <span>Giảm chuyển động</span>
+            <input type="checkbox" id="set-reduce-motion" />
+          </label>
+        </div>
+        <div class="setting-item setting-check">
+          <label>
+            <span>Chữ lớn (×1.25)</span>
+            <input type="checkbox" id="set-large-text" />
+          </label>
+        </div>
+        <div class="setting-item">
+          <label><span>Đổi phím</span><span id="keybind-status"></span></label>
+          <div class="keybind-grid" id="keybind-grid"></div>
+          <button type="button" class="btn" id="btn-keybind-reset">Khôi phục mặc định</button>
+        </div>
       </div>
       <button type="button" class="btn btn-primary" id="btn-settings-close">Lưu & Đóng</button>
     </div>
@@ -214,6 +237,14 @@ export function createHud(initialSettings, callbacks) {
           <span class="stat-box-val" id="res-total">0</span>
         </div>
       </div>
+      <div class="leaderboard-save" id="res-save-wrap">
+        <label for="res-name">Lưu điểm — tên (3–12 ký tự A-Z 0-9 _)</label>
+        <div class="btn-row">
+          <input type="text" id="res-name" maxlength="12" placeholder="TenBan" autocomplete="off" />
+          <button type="button" class="btn btn-primary" id="btn-res-save">Lưu</button>
+        </div>
+        <p class="modal-sub" id="res-save-msg"></p>
+      </div>
       <div class="btn-row">
         <button type="button" class="btn btn-primary" id="btn-res-next">Đêm tiếp theo</button>
         <button type="button" class="btn" id="btn-res-retry">Chơi lại Đêm này</button>
@@ -222,6 +253,28 @@ export function createHud(initialSettings, callbacks) {
     </div>
   `;
   document.body.appendChild(resultOverlay);
+
+  // Leaderboard overlay
+  const lbOverlay = document.createElement('div');
+  lbOverlay.id = 'screen-leaderboard';
+  lbOverlay.className = 'screen-overlay hidden';
+  lbOverlay.innerHTML = `
+    <div class="modal-card">
+      <h2>Bảng xếp hạng</h2>
+      <p class="modal-sub">Top 10 cục bộ — điểm cao nhất</p>
+      <ol class="lb-list" id="lb-list"></ol>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="btn-lb-back">Quay lại</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(lbOverlay);
+
+  // Accessibility caption bar
+  const captionBar = document.createElement('div');
+  captionBar.id = 'a11y-captions';
+  captionBar.setAttribute('aria-live', 'polite');
+  document.body.appendChild(captionBar);
 
   // Pre-build 3 flame pips & up to capacity_max mote slots
   const flamesEl = hud.querySelector('#hud-flames');
@@ -249,10 +302,63 @@ export function createHud(initialSettings, callbacks) {
   const setSfx = settingsOverlay.querySelector('#set-sfx');
   const setSens = settingsOverlay.querySelector('#set-sens');
   const setColorblind = settingsOverlay.querySelector('#set-colorblind');
+  const setReduceMotion = settingsOverlay.querySelector('#set-reduce-motion');
+  const setLargeText = settingsOverlay.querySelector('#set-large-text');
+  const keybindGrid = settingsOverlay.querySelector('#keybind-grid');
+  const keybindStatus = settingsOverlay.querySelector('#keybind-status');
   const valMaster = settingsOverlay.querySelector('#val-master');
   const valMusic = settingsOverlay.querySelector('#val-music');
   const valSfx = settingsOverlay.querySelector('#val-sfx');
   const valSens = settingsOverlay.querySelector('#val-sens');
+
+  let currentKeybinds = { ...DEFAULT_KEYBINDS, ...(initialSettings.keybinds || {}) };
+  let listeningAction = null;
+  const KEY_LABELS = {
+    moveUp: 'Lên', moveDown: 'Xuống', moveLeft: 'Trái', moveRight: 'Phải',
+    jump: 'Nhảy', dash: 'Lướt', interact: 'Tương tác', pulse: 'Tỏa sáng', pause: 'Tạm dừng',
+  };
+
+  function renderKeybindGrid() {
+    keybindGrid.innerHTML = '';
+    for (const [action, label] of Object.entries(KEY_LABELS)) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'btn keybind-btn';
+      row.dataset.action = action;
+      row.textContent = `${label}: ${currentKeybinds[action] || '?'}`;
+      row.addEventListener('click', () => {
+        listeningAction = action;
+        keybindStatus.textContent = `Nhấn phím cho «${label}»…`;
+        keybindStatus.classList.add('listening');
+      });
+      keybindGrid.appendChild(row);
+    }
+    const conflicts = findKeybindConflicts(currentKeybinds);
+    if (conflicts.length) {
+      keybindStatus.textContent = `⚠ Trùng phím: ${conflicts.map((c) => c.code).join(', ')}`;
+      keybindStatus.classList.add('conflict');
+    } else if (!listeningAction) {
+      keybindStatus.textContent = '';
+      keybindStatus.classList.remove('conflict', 'listening');
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!listeningAction || settingsOverlay.classList.contains('hidden')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    currentKeybinds = { ...currentKeybinds, [listeningAction]: e.code };
+    listeningAction = null;
+    renderKeybindGrid();
+    emitSettings();
+  }, true);
+
+  function applyA11yClasses(s) {
+    document.body.classList.toggle('colorblind', Boolean(s.colorblindPalette));
+    document.body.classList.toggle('reduce-motion', Boolean(s.reduceMotion));
+    document.body.classList.toggle('large-text', Boolean(s.largeText));
+    document.documentElement.style.setProperty('--ui-font-scale', s.largeText ? '1.25' : '1');
+  }
 
   function syncSettingsUI(s) {
     setMaster.value = s.masterVolume;
@@ -260,11 +366,15 @@ export function createHud(initialSettings, callbacks) {
     setSfx.value = s.sfxVolume;
     setSens.value = s.mouseSensitivity;
     setColorblind.checked = Boolean(s.colorblindPalette);
+    setReduceMotion.checked = Boolean(s.reduceMotion);
+    setLargeText.checked = Boolean(s.largeText);
+    currentKeybinds = { ...DEFAULT_KEYBINDS, ...(s.keybinds || {}) };
     valMaster.textContent = `${Math.round(s.masterVolume * 100)}%`;
     valMusic.textContent = `${Math.round(s.musicVolume * 100)}%`;
     valSfx.textContent = `${Math.round(s.sfxVolume * 100)}%`;
     valSens.textContent = s.mouseSensitivity.toFixed(2);
-    document.body.classList.toggle('colorblind', Boolean(s.colorblindPalette));
+    applyA11yClasses(s);
+    renderKeybindGrid();
   }
   syncSettingsUI(initialSettings);
 
@@ -275,12 +385,24 @@ export function createHud(initialSettings, callbacks) {
       sfxVolume: Number(setSfx.value),
       mouseSensitivity: Number(setSens.value),
       colorblindPalette: Boolean(setColorblind.checked),
+      reduceMotion: Boolean(setReduceMotion.checked),
+      largeText: Boolean(setLargeText.checked),
+      keybinds: { ...currentKeybinds },
     };
+    const conflicts = findKeybindConflicts(next.keybinds);
+    if (conflicts.length) {
+      keybindStatus.textContent = `⚠ Trùng phím — hãy đổi lại trước khi chơi`;
+      keybindStatus.classList.add('conflict');
+    }
     syncSettingsUI(next);
     callbacks.onSettingsChange(next);
   };
   [setMaster, setMusic, setSfx, setSens].forEach((el) => el.addEventListener('input', emitSettings));
-  setColorblind.addEventListener('change', emitSettings);
+  [setColorblind, setReduceMotion, setLargeText].forEach((el) => el.addEventListener('change', emitSettings));
+  settingsOverlay.querySelector('#btn-keybind-reset').addEventListener('click', () => {
+    currentKeybinds = { ...DEFAULT_KEYBINDS };
+    emitSettings();
+  });
 
   // Button listeners
   menuOverlay.querySelector('#btn-play-start').addEventListener('click', () => callbacks.onSelectNight(1));
@@ -288,6 +410,7 @@ export function createHud(initialSettings, callbacks) {
     btn.addEventListener('click', () => callbacks.onSelectNight(Number(btn.dataset.night)));
   });
   menuOverlay.querySelector('#btn-menu-settings').addEventListener('click', () => callbacks.onOpenSettings('menu'));
+  menuOverlay.querySelector('#btn-menu-leaderboard').addEventListener('click', () => callbacks.onOpenLeaderboard?.());
 
   introOverlay.querySelector('#btn-intro-go').addEventListener('click', () => callbacks.onStartPlaying());
   introOverlay.querySelector('#btn-intro-menu').addEventListener('click', () => callbacks.onMainMenu());
@@ -302,6 +425,23 @@ export function createHud(initialSettings, callbacks) {
   resultOverlay.querySelector('#btn-res-next').addEventListener('click', () => callbacks.onNextNight());
   resultOverlay.querySelector('#btn-res-retry').addEventListener('click', () => callbacks.onRestartNight());
   resultOverlay.querySelector('#btn-res-menu').addEventListener('click', () => callbacks.onMainMenu());
+  lbOverlay.querySelector('#btn-lb-back').addEventListener('click', () => callbacks.onMainMenu());
+
+  let pendingSave = null;
+  resultOverlay.querySelector('#btn-res-save').addEventListener('click', async () => {
+    const name = resultOverlay.querySelector('#res-name').value.trim();
+    const msg = resultOverlay.querySelector('#res-save-msg');
+    if (!validateName(name)) {
+      msg.textContent = '⚠ Tên không hợp lệ (3–12 ký tự A-Z, 0-9, _)';
+      return;
+    }
+    if (!pendingSave) {
+      msg.textContent = 'Không có điểm để lưu.';
+      return;
+    }
+    const res = await submitScore({ ...pendingSave, name });
+    msg.textContent = res.ok ? 'Đã lưu vào bảng xếp hạng!' : '⚠ Không lưu được tên.';
+  });
 
   const els = {
     clock: hud.querySelector('#hud-clock'),
@@ -456,14 +596,38 @@ export function createHud(initialSettings, callbacks) {
   }
 
   return {
+    async refreshLeaderboard() {
+      const board = await fetchLeaderboard();
+      const list = lbOverlay.querySelector('#lb-list');
+      list.innerHTML = '';
+      if (!board.entries.length) {
+        list.innerHTML = '<li class="lb-empty">Chưa có điểm nào — hãy chơi và lưu tên!</li>';
+        return;
+      }
+      for (const e of board.entries) {
+        const li = document.createElement('li');
+        li.textContent = `${e.name} — ${e.score} điểm · ${e.nights_won} đêm · ${e.achieved_at}`;
+        list.appendChild(li);
+      }
+    },
+
+    showCaption(text, ms = 2800) {
+      captionBar.textContent = text;
+      captionBar.classList.add('visible');
+      clearTimeout(showCaption._t);
+      showCaption._t = setTimeout(() => captionBar.classList.remove('visible'), ms);
+    },
+
     setScreen(screenName, data = {}) {
       menuOverlay.classList.toggle('hidden', screenName !== 'menu');
       introOverlay.classList.toggle('hidden', screenName !== 'intro');
       pauseOverlay.classList.toggle('hidden', screenName !== 'pause');
       settingsOverlay.classList.toggle('hidden', screenName !== 'settings');
       resultOverlay.classList.toggle('hidden', screenName !== 'result');
+      lbOverlay.classList.toggle('hidden', screenName !== 'leaderboard');
       hud.classList.toggle('hidden', screenName !== 'playing' && screenName !== 'pause');
       if (screenName !== 'playing') arrow.classList.remove('visible');
+      if (screenName === 'leaderboard') this.refreshLeaderboard();
 
       if (screenName === 'intro' && data.level) {
         els.introTitle.textContent = data.level.subtitle;
@@ -500,10 +664,27 @@ export function createHud(initialSettings, callbacks) {
         els.resLanterns.textContent = `${litCount}/${w.lanterns.length}`;
         els.resTotal.textContent = (data.totalScore ?? 0).toLocaleString('vi-VN');
         els.btnResNext.style.display = won && w.night < 3 ? 'inline-block' : 'none';
+        // Save score after any loss, or after winning Night 3 (Bình Minh)
+        const allowSave = !won || w.night >= 3;
+        const wrap = resultOverlay.querySelector('#res-save-wrap');
+        wrap.style.display = allowSave ? 'block' : 'none';
+        resultOverlay.querySelector('#res-save-msg').textContent = '';
+        resultOverlay.querySelector('#res-name').value = '';
+        pendingSave = allowSave
+          ? {
+              score: data.totalScore ?? w.score,
+              nights_won: data.nightsWon ?? (won && w.night >= 3 ? 3 : won ? w.night : Math.max(0, (w.night || 1) - 1)),
+              seed: w.seed ?? 0,
+            }
+          : null;
         showToast(won ? '✦ THẮNG!' : 'THUA!', !won);
       } else {
         resultOverlay.classList.remove('result-won', 'result-lost');
       }
+    },
+
+    setPendingSave(info) {
+      pendingSave = info;
     },
 
     reset() {
@@ -528,6 +709,12 @@ export function createHud(initialSettings, callbacks) {
           showToast(`⚠ Đèn ${ev.data.lantern_id} đã tắt!`, true);
         } else if (ev.name === 'fuel_drain') {
           showToast(`⚠ Bóng Mực đang hút dầu ${ev.data.lantern_id}!`, true);
+          captionBar.textContent = `⚠ Đèn ${ev.data.lantern_id} đang bị hút dầu`;
+          captionBar.classList.add('visible');
+        } else if (ev.name === 'shade_spawned') {
+          captionBar.textContent = '⚠ Bóng Mực xuất hiện';
+          captionBar.classList.add('visible');
+          showToast('⚠ Bóng Mực xuất hiện', true);
         } else if (ev.name === 'charm_picked') {
           showToast('✦ Nhặt Bùa Gió! Tăng tốc & Lướt không hồi chiêu (10s)');
         } else if (ev.name === 'drifter_steal') {
@@ -554,7 +741,7 @@ export function createHud(initialSettings, callbacks) {
         if (toastTimer <= 0) els.toast.classList.remove('visible');
       }
       if (hitFlashTimer > 0) hitFlashTimer -= dt;
-      vignette.classList.toggle('hit', hitFlashTimer > 0);
+      vignette.classList.toggle('hit', hitFlashTimer > 0 && !document.body.classList.contains('reduce-motion'));
       vignette.classList.toggle(
         'low-light',
         hitFlashTimer <= 0 && world.state === 'playing' && world.player.flames === 1,
@@ -584,8 +771,15 @@ export function createHud(initialSettings, callbacks) {
       } else if (world.wind?.warning) {
         els.wind.textContent = cb ? '⚠ Cảnh báo: Gió mạnh sắp tới!' : 'Cảnh báo: Gió mạnh sắp tới!';
         els.wind.className = 'wind-badge visible';
+        captionBar.textContent = '⚠ Gió mạnh sắp thổi';
+        captionBar.classList.add('visible');
       } else {
         els.wind.className = 'wind-badge';
+      }
+
+      if (timeLeftS <= 10 && timeLeftS > 0) {
+        captionBar.textContent = `⚠ Còn ${Math.ceil(timeLeftS)} giây`;
+        captionBar.classList.add('visible');
       }
 
       // Lanterns & Score
@@ -593,6 +787,10 @@ export function createHud(initialSettings, callbacks) {
       const lowFuel = world.lanterns.some(
         (l) => l.lit && l.fuelUnits < (TUNING.low_fuel_threshold ?? 30) * TICK_HZ,
       );
+      if (lowFuel) {
+        captionBar.textContent = '⚠ Đèn dầu thấp (< 30)';
+        captionBar.classList.add('visible');
+      }
       els.lanterns.textContent = lowFuel && cb
         ? `⚠ ${litCount}/${world.lanterns.length}`
         : `${litCount}/${world.lanterns.length}`;

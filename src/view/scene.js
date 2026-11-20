@@ -75,6 +75,7 @@ export function createScene(canvas) {
   renderer.toneMappingExposure = 1.1;
 
   let colorblindPalette = false;
+  let reduceMotion = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.sky);
@@ -1200,7 +1201,7 @@ export function createScene(canvas) {
     camDesired.set(camX, camY, camZ);
     camera.position.lerp(camDesired, Math.min(1, dt * 10));
 
-    if (shakeTime > 0) {
+    if (shakeTime > 0 && !reduceMotion) {
       const amp = shakeTime * 0.5;
       camera.position.x += (Math.random() - 0.5) * amp;
       camera.position.y += (Math.random() - 0.5) * amp;
@@ -1266,6 +1267,43 @@ export function createScene(canvas) {
     getOffscreenLanternIndicator,
     setColorblind(enabled) {
       colorblindPalette = Boolean(enabled);
+    },
+    setReduceMotion(enabled) {
+      reduceMotion = Boolean(enabled);
+      if (reduceMotion) shakeTime = 0;
+    },
+    getOffscreenShadeIndicator(world) {
+      const p = world.player.pos;
+      let best = null;
+      let bestD = Infinity;
+      for (const s of world.shades) {
+        if (s.state === 'spawning') continue;
+        const d = Math.hypot(s.pos[0] - p[0], s.pos[2] - p[2]);
+        if (d < bestD) {
+          bestD = d;
+          best = s;
+        }
+      }
+      if (!best || bestD < 18) return null;
+      projVec.set(best.pos[0], best.pos[1] + 1.2, best.pos[2]);
+      projVec.project(camera);
+      const inFront = projVec.z < 1;
+      const onScreen = inFront && Math.abs(projVec.x) <= 0.92 && Math.abs(projVec.y) <= 0.88;
+      if (onScreen) return null;
+      let sx = projVec.x;
+      let sy = projVec.y;
+      if (!inFront) {
+        sx = -sx;
+        sy = -sy;
+      }
+      const len = Math.hypot(sx, sy) || 1;
+      return {
+        nx: sx / len,
+        ny: -sy / len,
+        angleDeg: (Math.atan2(sx / len, -sy / len) * 180) / Math.PI,
+        dist: Math.round(bestD),
+        kind: 'shade',
+      };
     },
     player,
   };

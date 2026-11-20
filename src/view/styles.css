@@ -616,6 +616,95 @@ body.colorblind #hud-toast.danger {
   accent-color: var(--lantern-lit);
 }
 
+:root {
+  --ui-font-scale: 1;
+  --ui-font-min: 18px;
+}
+
+body {
+  font-size: calc(var(--ui-font-min) * var(--ui-font-scale));
+}
+
+body.large-text .modal-card,
+body.large-text #hud {
+  font-size: 1.25em;
+}
+
+body.reduce-motion #hud-vignette,
+body.reduce-motion #hud-vignette.hit {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+#a11y-captions {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%);
+  z-index: 35;
+  min-width: 220px;
+  max-width: min(520px, 90vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(14, 20, 48, 0.88);
+  border: 1px solid rgba(242, 193, 78, 0.35);
+  color: #fff;
+  font-weight: 700;
+  font-size: calc(18px * var(--ui-font-scale));
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+#a11y-captions.visible { opacity: 1; }
+
+body.colorblind #a11y-captions { color: #ffffff; }
+
+.keybind-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+.keybind-btn {
+  font-size: 0.78rem;
+  padding: 8px 10px;
+}
+#keybind-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+#keybind-status.conflict,
+#keybind-status.listening {
+  color: #ff9aa2;
+}
+
+.leaderboard-save {
+  text-align: left;
+  margin: 12px 0 8px;
+}
+.leaderboard-save input {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border-strong);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-ui);
+  font-size: 1rem;
+}
+.lb-list {
+  text-align: left;
+  margin: 12px auto 18px;
+  padding-left: 22px;
+  max-width: 420px;
+}
+.lb-list li {
+  margin: 6px 0;
+  color: var(--text-ui);
+}
+.lb-empty { list-style: none; margin-left: -22px; color: var(--text-muted); }
+
 @media (max-width: 780px) {
   .radar-wrap, .hud-bottom-left { display: none; }
   .hud-bottom { grid-template-columns: 1fr auto; }

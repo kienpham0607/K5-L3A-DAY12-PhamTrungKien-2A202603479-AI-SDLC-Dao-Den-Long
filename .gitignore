@@ -10,3 +10,5 @@ out.jsonl
 .vite/
 coverage/
 tests/.out/
+*.zip
+out-lb.json

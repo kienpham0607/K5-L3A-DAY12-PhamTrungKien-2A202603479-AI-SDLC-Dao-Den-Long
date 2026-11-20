@@ -1,0 +1,28 @@
+{
+  "name": "dao-den-long",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Đảo Đèn Lồng — Day 12 AI SDLC Phase 1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "headless": "node src/headless/cli.js",
+    "test": "node --test tests/contract/*.test.js tests/unit/*.test.js",
+    "test:step1": "node --test tests/contract/cli_stub.test.js tests/unit/tuning.test.js",
+    "test:step2": "node --test tests/contract/move.test.js tests/unit/movement.test.js",
+    "test:pickup": "node --test tests/contract/pickup.test.js tests/unit/pickup.test.js",
+    "test:deposit": "node --test tests/contract/deposit.test.js tests/unit/deposit.test.js",
+    "test:shades": "node --test tests/contract/hit.test.js tests/unit/shades_combat.test.js",
+    "test:pulse": "node --test tests/contract/pulse.test.js tests/unit/pulse.test.js",
+    "test:winlose": "node --test tests/contract/winlose.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "three": "^0.170.0",
+    "vite": "^6.0.0"
+  }
+}

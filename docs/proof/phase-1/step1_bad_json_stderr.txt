@@ -1,0 +1,3 @@
+exit=2
+Invalid JSON in inputs: Unexpected token 'h', "this is not json {
+" is not valid JSON

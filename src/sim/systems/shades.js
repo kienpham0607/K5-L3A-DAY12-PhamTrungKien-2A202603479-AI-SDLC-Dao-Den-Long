@@ -7,7 +7,7 @@ import { clampOutsideSafeZones } from './safeZones.js';
 /**
  * Step 8a: Shade AI state machine (`spawning`, `wander`, `chase`, `recoil`, `stunned`).
  * - Speed: 4.0 m/s (Night 3: 4.5 m/s)
- * - Detect/leash từ tuning (mặc định 35m / 55m — đuổi từ xa)
+ * - Detect/leash từ tuning (mặc định 12m / 18m — chỉ đuổi khi lại gần)
  * - Stunned: 120 ticks, pushed 4m over first 15 ticks
  * - Recoil: 2m over 60 ticks after hitting player
  */

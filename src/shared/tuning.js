@@ -53,9 +53,9 @@ export const TUNING = {
   safe_push_max_ticks: 30,
   shade_speed: 4.0,
   shade_speed_night3: 4.5,
-  // Detect/leash lớn hơn để đuổi từ xa (không cần lại gần mới chase)
-  shade_detect_radius: 35,
-  shade_leash_radius: 55,
+  // Chỉ đuổi khi Mây lại gần; ra xa thì bỏ chase về wander
+  shade_detect_radius: 12,
+  shade_leash_radius: 18,
   shade_hit_radius: 1.0,
   shade_hit_height: 1.5,
   shade_recoil_m: 2.0,

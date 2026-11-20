@@ -419,6 +419,46 @@ kbd {
 }
 .screen-overlay.hidden { display: none; }
 
+.result-badge {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+#screen-result.result-won .result-badge {
+  color: #1a2e14;
+  background: linear-gradient(135deg, #c8f07a, #f2c14e);
+  border-color: rgba(242, 193, 78, 0.7);
+  box-shadow: 0 0 24px rgba(200, 240, 122, 0.35);
+}
+
+#screen-result.result-lost .result-badge {
+  color: #fff5f5;
+  background: linear-gradient(135deg, #a33a45, #6b1f2a);
+  border-color: rgba(255, 120, 130, 0.55);
+  box-shadow: 0 0 24px rgba(255, 90, 95, 0.3);
+}
+
+#screen-result.result-won .modal-card {
+  border-color: rgba(200, 240, 122, 0.45);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 40px rgba(200, 240, 122, 0.18);
+}
+
+#screen-result.result-lost .modal-card {
+  border-color: rgba(255, 120, 130, 0.4);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 40px rgba(255, 90, 95, 0.16);
+}
+
+#screen-result.result-lost h2 {
+  color: #ff9aa2;
+}
+
 .modal-card {
   width: min(490px, 92vw);
   padding: 32px 30px 28px;

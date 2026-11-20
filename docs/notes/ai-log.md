@@ -27,6 +27,13 @@
 | Lỗi AI phát hiện | Lần đầu thiếu PRD — agent đúng khi dừng thay vì bịa yêu cầu |
 | Việc chờ user | Duyệt assumptions (số tuning) + plan trước khi scaffold code |
 
+## Session 13 — Fix A/D đảo hướng
+
+| Mục | Nội dung |
+|---|---|
+| Bug | A sang phải, D sang trái (camera Three.js lookAt đảo trục strafe) |
+| Fix | Đảo map A/D trong `src/view/input.js` (chỉ view; headless giữ nguyên) |
+
 ## Session 12 — Thêm đom đóm + shade đuổi từ xa
 
 | Mục | Nội dung |

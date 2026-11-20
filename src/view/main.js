@@ -46,6 +46,16 @@ function safePointerLock() {
   }
 }
 
+function showResultScreen() {
+  if (document.pointerLockElement) document.exitPointerLock();
+  screen = 'result';
+  hud.setScreen('result', {
+    world,
+    totalScore,
+    reason: lastGameOverReason,
+  });
+}
+
 const hud = createHud(settings, {
   onSelectNight(night) {
     audio.unlock();
@@ -133,9 +143,9 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  // Handle Esc/P pause toggle cleanly
+  // Handle Esc/P pause toggle cleanly (ignore while result is showing)
   if (input.consumePause()) {
-    if (screen === 'playing') {
+    if (screen === 'playing' && world.state === 'playing') {
       world.paused = true;
       screen = 'pause';
       if (document.pointerLockElement) document.exitPointerLock();
@@ -208,16 +218,15 @@ function frame(now) {
         }
       }
     }
+  }
 
-    if (world.state !== 'playing') {
-      if (document.pointerLockElement) document.exitPointerLock();
-      screen = 'result';
-      hud.setScreen('result', {
-        world,
-        totalScore,
-        reason: lastGameOverReason,
-      });
-    }
+  // Always surface win/lose UI when sim ends (even if paused mid-transition)
+  if (
+    (world.state === 'won' || world.state === 'lost') &&
+    screen !== 'result' &&
+    screen !== 'menu'
+  ) {
+    showResultScreen();
   }
 
   sceneView.sync(world, dt);

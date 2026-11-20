@@ -14,8 +14,11 @@ export function createInput(initialSensitivity = 0.16) {
   const syncMove = () => {
     let x = 0;
     let z = 0;
-    if (state._keys.has('KeyD') || state._keys.has('ArrowRight')) x += 1;
-    if (state._keys.has('KeyA') || state._keys.has('ArrowLeft')) x -= 1;
+    // Strafe is negated vs Contract +X: Three.js lookAt third-person camera
+    // has view-right = -worldBasisX for our yaw placement, so A/D must flip
+    // for camera-relative controls. Headless inputs are unchanged (sim math).
+    if (state._keys.has('KeyD') || state._keys.has('ArrowRight')) x -= 1;
+    if (state._keys.has('KeyA') || state._keys.has('ArrowLeft')) x += 1;
     if (state._keys.has('KeyW') || state._keys.has('ArrowUp')) z += 1;
     if (state._keys.has('KeyS') || state._keys.has('ArrowDown')) z -= 1;
     state.move = [x, z];

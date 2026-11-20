@@ -190,7 +190,8 @@ export function createHud(initialSettings, callbacks) {
   resultOverlay.id = 'screen-result';
   resultOverlay.className = 'screen-overlay hidden';
   resultOverlay.innerHTML = `
-    <div class="modal-card">
+    <div class="modal-card result-card">
+      <p class="result-badge" id="res-badge">THẮNG</p>
       <h2 id="res-title">Thắng!</h2>
       <p class="modal-sub" id="res-desc"></p>
       <div class="stats-grid">
@@ -314,6 +315,7 @@ export function createHud(initialSettings, callbacks) {
     introLanterns: introOverlay.querySelector('#intro-lanterns'),
     introTime: introOverlay.querySelector('#intro-time'),
     introTotal: introOverlay.querySelector('#intro-total'),
+    resBadge: resultOverlay.querySelector('#res-badge'),
     resTitle: resultOverlay.querySelector('#res-title'),
     resDesc: resultOverlay.querySelector('#res-desc'),
     resScore: resultOverlay.querySelector('#res-score'),
@@ -463,11 +465,17 @@ export function createHud(initialSettings, callbacks) {
         const won = w.state === 'won';
         const litCount = w.lanterns.filter((l) => l.lit).length;
         const isDawn = won && w.night === 3;
+        const nightName = w.level?.subtitle ?? `Đêm ${w.night}`;
+        resultOverlay.classList.toggle('result-won', won);
+        resultOverlay.classList.toggle('result-lost', !won);
+        els.resBadge.textContent = won ? 'THẮNG' : 'THUA';
         els.resTitle.textContent = isDawn
           ? '✦ Bình Minh Đảo Đèn Lồng! ✦'
           : won
-            ? `Hoàn thành ${w.level.subtitle}!`
-            : 'Sương Đen Phủ Kín';
+            ? `Thắng — ${nightName}`
+            : data.reason === 'dawn'
+              ? 'Thua — Hết giờ (Bình minh)'
+              : 'Thua — Hết Ngọn Lửa';
         els.resDesc.textContent = isDawn
           ? 'Mây đã thắp sáng cả ba hòn đảo và đưa ánh bình minh trở lại biển mây!'
           : won
@@ -479,6 +487,9 @@ export function createHud(initialSettings, callbacks) {
         els.resLanterns.textContent = `${litCount}/${w.lanterns.length}`;
         els.resTotal.textContent = (data.totalScore ?? 0).toLocaleString('vi-VN');
         els.btnResNext.style.display = won && w.night < 3 ? 'inline-block' : 'none';
+        showToast(won ? '✦ THẮNG!' : 'THUA!', !won);
+      } else {
+        resultOverlay.classList.remove('result-won', 'result-lost');
       }
     },
 
@@ -507,6 +518,8 @@ export function createHud(initialSettings, callbacks) {
               : 'Chạm Bóng Mực! Mất 1 Ngọn Lửa',
             true,
           );
+        } else if (ev.name === 'game_over') {
+          showToast(ev.data.result === 'won' ? '✦ THẮNG!' : 'THUA!', ev.data.result !== 'won');
         }
       }
     },

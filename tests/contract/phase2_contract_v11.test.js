@@ -24,7 +24,7 @@ before(() => {
   mkdirSync(outDir, { recursive: true });
 });
 
-describe('Contract v1.1 CLI, Schema, Scenarios & Benchmark', () => {
+describe('Contract v1.2 CLI, Schema, Scenarios & Benchmark (Phase 2 regression + v1.2 fields)', () => {
   it('supports --night 1, 2, 3 and rejects invalid --night 4', () => {
     for (const night of [1, 2, 3]) {
       const out = join(outDir, `v11_n${night}.jsonl`);
@@ -43,9 +43,16 @@ describe('Contract v1.1 CLI, Schema, Scenarios & Benchmark', () => {
       assert.equal(typeof snap0.player.dash_cd_s, 'number');
       assert.equal(typeof snap0.player.pulse_cd_s, 'number');
       assert.equal(typeof snap0.player.charm_s, 'number');
+      assert.equal(typeof snap0.player.capacity, 'number');
+      assert.equal(snap0.player.capacity, 10);
       assert.ok(Array.isArray(snap0.motes));
       assert.ok(Array.isArray(snap0.drifters));
       assert.ok(Array.isArray(snap0.charms));
+      for (const lan of snap0.lanterns) {
+        assert.equal(typeof lan.fuel, 'number');
+        assert.equal(typeof lan.ever_lit, 'boolean');
+        assert.equal(typeof lan.relit_count, 'number');
+      }
     }
 
     const bad = runCli(['--seed', '1', '--night', '4', '--ticks', '10', '--out', join(outDir, 'bad.jsonl')]);

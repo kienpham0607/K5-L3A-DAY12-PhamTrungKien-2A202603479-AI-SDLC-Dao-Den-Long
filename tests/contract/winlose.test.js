@@ -1,10 +1,9 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TUNING } from '../../src/shared/tuning.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const cli = join(root, 'src/headless/cli.js');
@@ -29,9 +28,9 @@ before(() => {
   mkdirSync(outDir, { recursive: true });
 });
 
-describe('T-win / T-lose / T-dawn', () => {
-  it('lighting last lantern → won all_lit + end', () => {
-    const out = join(outDir, 'win.jsonl');
+describe('T-win / T-lose / T-dawn (Phase 3)', () => {
+  it('lighting last lantern does NOT win early (all_lit removed)', () => {
+    const out = join(outDir, 'win_no_early.jsonl');
     const r = runCli([
       '--seed', '1',
       '--night', '1',
@@ -44,15 +43,48 @@ describe('T-win / T-lose / T-dawn', () => {
     assert.equal(r.status, 0, r.stderr);
     const lines = parseJsonl(readFileSync(out, 'utf8'));
     assert.ok(lines.some((l) => l.name === 'lantern_lit'));
+    assert.equal(lines.filter((l) => l.name === 'game_over').length, 0);
+    const end = lines[lines.length - 1];
+    assert.equal(end.state, 'playing');
+  });
+
+  it('dawn_survived when enough lanterns lit at timer end', () => {
+    const scenarioPath = join(outDir, 'dawn_win_scenario.json');
+    writeFileSync(
+      scenarioPath,
+      JSON.stringify({
+        player: { pos: [0, 0, 0], flames: 3 },
+        time_left_s: 1,
+        random_motes: false,
+        random_shades: false,
+        motes: [],
+        shades: [],
+        lanterns: [
+          { id: 'L1', lit: true, fuel: 80 },
+          { id: 'L2', lit: true, fuel: 70 },
+          { id: 'L3', lit: true, fuel: 60 },
+          { id: 'L4', lit: false },
+          { id: 'L5', lit: false },
+        ],
+      }),
+    );
+    const out = join(outDir, 'dawn_win.jsonl');
+    const r = runCli([
+      '--seed', '1',
+      '--night', '1',
+      '--scenario', scenarioPath,
+      '--ticks', '120',
+      '--out', out,
+      '--snapshot-every', '60',
+    ]);
+    assert.equal(r.status, 0, r.stderr);
+    const lines = parseJsonl(readFileSync(out, 'utf8'));
     const go = lines.find((l) => l.name === 'game_over');
     assert.ok(go);
-    assert.deepEqual(go.data, { result: 'won', reason: 'all_lit' });
-    const end = lines[lines.length - 1];
-    assert.equal(end.type, 'end');
-    assert.equal(end.state, 'won');
-    // per_lantern 200 + floor(time)*1 + flames*50
-    assert.ok(end.score >= TUNING.score.per_lantern + TUNING.score.per_flame_left * 3);
-    assert.ok(end.ticks < 10, 'should stop early on win');
+    assert.deepEqual(go.data, { result: 'won', reason: 'dawn_survived' });
+    assert.equal(lines[lines.length - 1].state, 'won');
+    // Dawn bonuses: 3*(50+floor fuel) + 3*50 — fuel decays 1 over 60 ticks
+    assert.ok(lines[lines.length - 1].score > 0);
   });
 
   it('flames to 0 → lost no_flames', () => {
@@ -72,7 +104,7 @@ describe('T-win / T-lose / T-dawn', () => {
     assert.equal(lines[lines.length - 1].state, 'lost');
   });
 
-  it('time out → lost dawn', () => {
+  it('time out with too few lit → lost dawn', () => {
     const out = join(outDir, 'lose_dawn.jsonl');
     const r = runCli([
       '--seed', '1',

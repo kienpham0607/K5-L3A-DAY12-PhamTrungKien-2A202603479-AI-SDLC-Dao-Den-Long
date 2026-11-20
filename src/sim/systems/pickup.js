@@ -1,9 +1,11 @@
 import { TUNING } from '../../shared/tuning.js';
 import { distXZ } from '../math.js';
+import { playerCapacity } from './deposit.js';
 
 /**
- * Step 4: Pick up Motes (XZ <= 1m, |dy| <= 1.5m, capacity 10) and Wind Charms.
- * Dropped motes can be picked up starting from the next tick (spawnedTick < stepsDone).
+ * Step 4: Pick up Motes (XZ <= 1m, |dy| <= 1.5m) and Wind Charms.
+ * Capacity = min(20, 10 + 2 * successful_lights).
+ * Dropped motes pickable from next tick (spawnedTick < stepsDone).
  * @returns {object[]} events without tick
  */
 export function applyPickup(world, tuning = TUNING) {
@@ -13,7 +15,7 @@ export function applyPickup(world, tuning = TUNING) {
 
   const radius = tuning.pickup_radius ?? 1.0;
   const maxDy = tuning.pickup_height ?? 1.5;
-  const cap = tuning.carry_capacity ?? 10;
+  const cap = playerCapacity(world, tuning);
 
   // 1. Fireflies (Motes)
   if (p.carried < cap) {

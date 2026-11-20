@@ -1,25 +1,31 @@
 import { TUNING } from '../../shared/tuning.js';
 import { timeLeft } from '../stubWorld.js';
+import { floorFuel } from './fuel.js';
 
-function applyWinBonuses(world, tuning) {
-  const left = Math.max(0, timeLeft(world));
-  const seconds = Math.floor(left);
-  world.score += seconds * (tuning.score?.per_second_left ?? 2);
+function requiredLit(total, tuning = TUNING) {
+  const ratio = tuning.win_ratio ?? 0.6;
+  return Math.ceil(ratio * total);
+}
+
+function applyDawnVictoryBonuses(world, tuning) {
+  for (const lantern of world.lanterns) {
+    if (!lantern.lit) continue;
+    world.score += (tuning.score?.per_dawn_lantern ?? 50) + floorFuel(lantern);
+  }
   world.score += world.player.flames * (tuning.score?.per_flame_left ?? 50);
 }
 
 /**
- * Step 11: Win/Lose evaluation in exact priority order:
- * 1. flames <= 0 -> lost (no_flames)
- * 2. flames > 0 && all lanterns lit -> won (all_lit) + win bonus
- * 3. timeLeft <= 0 -> lost (dawn)
+ * Step 11 (Phase 3): Win/Lose after all tick updates.
+ * 1. flames <= 0 → lost (no_flames) — precedence even on final tick
+ * 2. timeLeft <= 0 → if lit >= ceil(0.6*N) → won (dawn_survived), else lost (dawn)
+ * No early victory when all lanterns lit.
  * @returns {object[]} events without tick
  */
 export function checkWinLose(world, tuning = TUNING) {
   const events = [];
   if (world.state !== 'playing') return events;
 
-  // Priority 1: No flames -> immediate defeat
   if (world.player.flames <= 0) {
     world.state = 'lost';
     events.push({
@@ -30,32 +36,31 @@ export function checkWinLose(world, tuning = TUNING) {
     return events;
   }
 
-  // Priority 2: Alive and all lanterns lit -> victory
-  const allLit = world.lanterns.length > 0 && world.lanterns.every((l) => l.lit);
-  if (allLit) {
+  if (timeLeft(world) > 0) return events;
+
+  const litCount = world.lanterns.filter((l) => l.lit).length;
+  const need = requiredLit(world.lanterns.length, tuning);
+
+  if (litCount >= need) {
     world.state = 'won';
-    applyWinBonuses(world, tuning);
+    applyDawnVictoryBonuses(world, tuning);
     events.push({
       type: 'event',
       name: 'game_over',
-      data: { result: 'won', reason: 'all_lit' },
+      data: { result: 'won', reason: 'dawn_survived' },
     });
     return events;
   }
 
-  // Priority 3: Time ran out -> dawn defeat
-  if (timeLeft(world) <= 0) {
-    world.state = 'lost';
-    events.push({
-      type: 'event',
-      name: 'game_over',
-      data: { result: 'lost', reason: 'dawn' },
-    });
-  }
-
+  world.state = 'lost';
+  events.push({
+    type: 'event',
+    name: 'game_over',
+    data: { result: 'lost', reason: 'dawn' },
+  });
   return events;
 }
 
-// Keep legacy exports for compatibility if referenced
 export const checkOutcome = checkWinLose;
 export const checkDawn = () => [];
+export { requiredLit };

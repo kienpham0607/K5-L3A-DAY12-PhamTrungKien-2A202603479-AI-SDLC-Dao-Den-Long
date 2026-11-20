@@ -14,12 +14,12 @@ describe('Phase 2 Levels Configuration (Night 1, 2, 3)', () => {
     const n2 = getLevel(2);
     const n3 = getLevel(3);
     assert.equal(n1.lanterns.length, 5);
-    assert.equal(n1.duration_s, 300);
+    assert.equal(n1.duration_s, 240);
     assert.equal(n1.shadeSpeed, 4.0);
     assert.equal(n1.hasDrifters, false);
 
     assert.equal(n2.lanterns.length, 6);
-    assert.equal(n2.duration_s, 330);
+    assert.equal(n2.duration_s, 270);
     assert.equal(n2.islands.length, 2);
     assert.equal(n2.bridges.length, 1);
     assert.equal(n2.jumpPads.length, 2);
@@ -27,7 +27,7 @@ describe('Phase 2 Levels Configuration (Night 1, 2, 3)', () => {
     assert.equal(n2.hasDrifters, true);
 
     assert.equal(n3.lanterns.length, 7);
-    assert.equal(n3.duration_s, 360);
+    assert.equal(n3.duration_s, 300);
     assert.equal(n3.shadeSpeed, 4.5);
     assert.equal(n3.tiers.length, 2);
     assert.equal(n3.ramps.length, 2);

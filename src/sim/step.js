@@ -10,6 +10,7 @@ import { applyCombat } from './systems/combat.js';
 import { updateWind } from './systems/wind.js';
 import { applySpawns } from './spawn.js';
 import { checkWinLose } from './systems/winlose.js';
+import { applyFuelTick } from './systems/fuel.js';
 
 function defaultPrevInput() {
   return {
@@ -30,14 +31,12 @@ function advanceTimers(world, tuning) {
   if (p.pulseCdTicks > 0) p.pulseCdTicks -= 1;
   if (p.charmTicks > 0) p.charmTicks -= 1;
 
-  // Dropped mote TTL expiration (480 ticks)
   for (const m of world.motes) {
     if (!m.active || m.ttlTicks == null) continue;
     m.ttlTicks -= 1;
     if (m.ttlTicks <= 0) m.active = false;
   }
 
-  // Wind Charm respawn timers (2700 ticks)
   for (const c of world.charms) {
     if (c.active) continue;
     if (c.respawnTicks > 0) {
@@ -46,34 +45,31 @@ function advanceTimers(world, tuning) {
     }
   }
 
-  // Night 3 Wind cycle
   updateWind(world, tuning);
 }
 
 /**
- * Exact 12-step tick order (TICKET-02):
- * 1. Pause toggle (if paused: tick advances, sim_tick & timers freeze)
- * 2. Countdown & timers (sim_tick advances)
- * 3. Movement (walk, accel, jump, dash, jump pads, wind, fall/respawn)
- * 4. Pickup (motes & wind charms)
- * 5. Deposit (lanterns)
- * 6. Safe zones (push shades out of lit lanterns <= 30 ticks)
- * 7. Pulse (stun/push shades, repel/drop drifters)
- * 8. Enemy AI (shades + drifters)
- * 9. Collision (shade hit)
- * 10. Spawn (motes, shades, drifters)
- * 11. Win/Lose (no_flames > all_lit > dawn)
- * 12. Snapshot (handled by caller/runner)
+ * Exact tick order (TICKET-02 + Phase 3 fuel):
+ * 1. Pause toggle
+ * 2. Countdown & timers + fuel decay + shade drain + extinguish
+ * 3. Movement
+ * 4. Pickup
+ * 5. Deposit / refuel / relight
+ * 6. Safe zones (fuel >= 30)
+ * 7. Pulse
+ * 8. Enemy AI (shades + drain transitions + drifters)
+ * 9. Collision
+ * 10. Spawn
+ * 11. Win/Lose (no_flames > dawn_survived/dawn)
+ * 12. Snapshot (caller)
  */
 export function step(world, input, tuning = TUNING) {
   const events = [];
   if (!world._prevInput) world._prevInput = defaultPrevInput();
   const prevInput = world._prevInput;
 
-  // External tick always advances
   world.tick += 1;
 
-  // Step 1: Pause edge
   const pauseEdge = Boolean(input?.pause) && !Boolean(prevInput?.pause);
   if (pauseEdge && world.state === 'playing') {
     world.paused = !world.paused;
@@ -84,7 +80,6 @@ export function step(world, input, tuning = TUNING) {
     });
   }
 
-  // Save input for next tick's edge detection
   world._prevInput = {
     move: input?.move ? [...input.move] : [0, 0],
     cam_yaw_deg: input?.cam_yaw_deg ?? 0,
@@ -100,9 +95,10 @@ export function step(world, input, tuning = TUNING) {
     return { events };
   }
 
-  // Step 2: Countdown & timers
+  // Step 2: Countdown & timers + fuel
   world.stepsDone += 1;
   advanceTimers(world, tuning);
+  events.push(...applyFuelTick(world, tuning));
 
   // Step 3: Movement
   events.push(...applyMovement(world, input, prevInput, tuning));

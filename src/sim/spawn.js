@@ -82,6 +82,9 @@ function spawnOneShade(world, pos) {
     inSafePush: false,
     wanderAngle: world.rng() * Math.PI * 2,
     wanderTimer: 60,
+    targetLanternId: null,
+    drainEmitTicks: 0,
+    wasDraining: false,
   };
   world.shades.push(shade);
   return {

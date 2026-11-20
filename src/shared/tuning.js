@@ -1,5 +1,5 @@
 /**
- * Single source of tuning values for Phase 2 (TICKET-02 + Test Contract v1.1).
+ * Single source of tuning values for Phase 3 (TICKET-03 + Test Contract v1.2).
  * Must stay in sync with game.contract.json (verified by unit tests).
  */
 export const TUNING = {
@@ -14,7 +14,9 @@ export const TUNING = {
 
   // Fireflies & Lanterns
   carry_capacity: 10,
+  capacity_max: 20,
   lantern_cost: 10,
+  relight_cost: 5,
   lantern_count_night1: 5,
   lantern_count_night2: 6,
   lantern_count_night3: 7,
@@ -26,6 +28,16 @@ export const TUNING = {
   mote_spawn_interval_ticks: 120,
   dropped_mote_ttl_ticks: 480,
 
+  // Fuel (Phase 3)
+  fuel_max: 100,
+  fuel_decay_per_s: 1.0,
+  fuel_per_mote: 10,
+  low_fuel_threshold: 30,
+  drain_per_s: 5,
+  drain_enter_radius: 2.0,
+  drain_chase_radius: 6.0,
+  win_ratio: 0.6,
+
   // Pulse
   pulse_cost: 3,
   pulse_radius: 5,
@@ -36,10 +48,10 @@ export const TUNING = {
   pulse_push_ticks: 15,
   pulse_cooldown_s: 3.0,
 
-  // Nights & health
-  night1_duration_s: 300,
-  night2_duration_s: 330,
-  night3_duration_s: 360,
+  // Nights & health (Phase 3 durations)
+  night1_duration_s: 240,
+  night2_duration_s: 270,
+  night3_duration_s: 300,
   flames: 3,
   invuln_s: 1.5,
   invuln_ticks: 90,
@@ -53,7 +65,6 @@ export const TUNING = {
   safe_push_max_ticks: 30,
   shade_speed: 4.0,
   shade_speed_night3: 4.5,
-  // Chỉ đuổi khi Mây lại gần; ra xa thì bỏ chase về wander
   shade_detect_radius: 12,
   shade_leash_radius: 18,
   shade_hit_radius: 1.0,
@@ -90,10 +101,12 @@ export const TUNING = {
   island_radius: 40,
 
   score: {
-    per_mote: 10,
+    per_mote: 5,
     per_lantern: 100,
+    per_relight: 40,
     per_stun: 5,
-    per_second_left: 2,
+    per_drain_stun: 15,
+    per_dawn_lantern: 50,
     per_flame_left: 50,
   },
 };
@@ -130,6 +143,14 @@ export function contractTuning() {
     shade_speed_night3: TUNING.shade_speed_night3,
     shade_hit_radius: TUNING.shade_hit_radius,
     fall_enabled: TUNING.fall_enabled,
+    fuel_max: TUNING.fuel_max,
+    fuel_decay_per_s: TUNING.fuel_decay_per_s,
+    fuel_per_mote: TUNING.fuel_per_mote,
+    relight_cost: TUNING.relight_cost,
+    win_ratio: TUNING.win_ratio,
+    drain_per_s: TUNING.drain_per_s,
+    low_fuel_threshold: TUNING.low_fuel_threshold,
+    capacity_max: TUNING.capacity_max,
     score: { ...TUNING.score },
   };
 }

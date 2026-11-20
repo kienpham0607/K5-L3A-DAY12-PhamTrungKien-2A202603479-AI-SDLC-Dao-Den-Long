@@ -1,27 +1,31 @@
 import { TUNING } from '../../shared/tuning.js';
-import { TICK_HZ } from '../../shared/constants.js';
 import { distXZ } from '../math.js';
+import { hasSafetyZone } from './fuel.js';
 
 /**
- * Step 6: Lit lanterns create safe zones of radius 6m.
- * Shades already inside must be pushed out in at most 30 ticks and deal no damage while being pushed.
+ * Step 6: Lit lanterns with fuel >= low_fuel_threshold create safe zones (radius 6m).
+ * Shades inside are pushed out in ≤ 30 ticks and deal no damage while pushed.
  */
 export function applySafeZones(world, tuning = TUNING) {
   const safeR = tuning.safe_radius ?? 6;
   const maxPushTicks = tuning.safe_push_max_ticks ?? 30;
-  // Push speed sufficient to clear full radius (6m) within <= 30 ticks (0.5s) -> >= 12.6 m/s
   const pushStep = (safeR + 0.3) / maxPushTicks;
 
-  const litLanterns = world.lanterns.filter((l) => l.lit);
+  const safeLanterns = world.lanterns.filter((l) => hasSafetyZone(l, tuning));
 
   for (const shade of world.shades) {
     shade.inSafePush = false;
-    if (litLanterns.length === 0) continue;
+    if (safeLanterns.length === 0) continue;
 
-    for (const l of litLanterns) {
+    for (const l of safeLanterns) {
       const d = distXZ(shade.pos, l.pos);
       if (d < safeR) {
         shade.inSafePush = true;
+        if (shade.state === 'drain') {
+          shade.state = 'wander';
+          shade.targetLanternId = null;
+          shade.drainEmitTicks = 0;
+        }
         let dx = shade.pos[0] - l.pos[0];
         let dz = shade.pos[2] - l.pos[2];
         let len = Math.hypot(dx, dz);
@@ -37,17 +41,21 @@ export function applySafeZones(world, tuning = TUNING) {
       }
     }
   }
+
+  for (const l of world.lanterns) {
+    l._justGainedSafety = false;
+  }
 }
 
 /**
- * Clamp a shade's candidate XZ position so an outside shade cannot enter any lit lantern safe zone.
+ * Clamp candidate XZ so shades outside cannot enter a fuel>=30 safety zone.
  */
 export function clampOutsideSafeZones(world, x, z, tuning = TUNING) {
   const safeR = (tuning.safe_radius ?? 6) + 0.05;
   let rx = x;
   let rz = z;
   for (const l of world.lanterns) {
-    if (!l.lit) continue;
+    if (!hasSafetyZone(l, tuning)) continue;
     const dx = rx - l.pos[0];
     const dz = rz - l.pos[2];
     const d = Math.hypot(dx, dz);

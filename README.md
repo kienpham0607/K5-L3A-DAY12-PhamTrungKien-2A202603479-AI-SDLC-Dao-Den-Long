@@ -1,6 +1,6 @@
 # Đảo Đèn Lồng
 
-Game 3D phiêu lưu cổ tích (Three.js) — Lab Day 12 AI SDLC · **Phase 2 (TICKET-02 "Ba hòn đảo")** · MSSV `2A202603479` · Phạm Trung Kiên
+Game 3D phiêu lưu cổ tích (Three.js) — Lab Day 12 AI SDLC · **Phase 3 (TICKET-03 "Đèn cạn dầu")** · MSSV `2A202603479` · Phạm Trung Kiên
 
 ## Cài đặt & chạy (Windows PowerShell)
 
@@ -9,53 +9,57 @@ npm install
 npm run dev
 ```
 
-Mở URL Vite hiển thị (mặc định `http://localhost:5173`).
-
-Build production:
+Mở URL Vite (mặc định `http://localhost:5173`).
 
 ```powershell
 npm run build
+npm test
 ```
 
-## Chạy Test & Headless (Test Contract v1.1)
+## Headless (Test Contract v1.2)
 
 ```powershell
-npm test
 node src/headless/cli.js --seed 1 --night 1 --ticks 60 --out out_n1.jsonl --snapshot-every 10
-node src/headless/cli.js --seed 1 --night 2 --scenario tests/scenarios/p2_night2_drifter_steal.json --ticks 30 --out out_n2.jsonl
+node src/headless/cli.js --seed 1 --night 1 --scenario tests/scenarios/p3_dawn_win.json --ticks 90 --out dawn_win.jsonl
+node src/headless/cli.js --seed 1 --night 1 --scenario tests/scenarios/p3_shade_drain.json --ticks 120 --out drain.jsonl
 node src/headless/cli.js --seed 123 --night 3 --ticks 21600 --out bench_n3.jsonl --snapshot-every 600
 ```
 
-## 3 Hòn Đảo (3 Đêm)
+## 3 Hòn Đảo
 
-1. **Đêm 1 · Đảo Bến** (300s · 5 Đèn Lồng Lớn): đảo tròn bán kính 40m.
-2. **Đêm 2 · Đảo Cau** (330s · 6 Đèn Lồng Lớn): 2 đảo nối nhau bằng cầu tre không lan can + 2 bục nhảy gió + **Gió Lạc (Drifter)** + **Bùa Gió (Wind Charm)**.
-3. **Đêm 3 · Đảo Chuông** (360s · 7 Đèn Lồng Lớn): đảo 3 tầng (Y=0/3/6) có 2 dốc lên, bục nhảy lên đỉnh, Tháp Chuông trung tâm và **Gió mạnh** theo chu kỳ 30 giây.
+1. **Đêm 1 · Đảo Bến** (240s · 5 đèn · cần ≥3 sáng tới bình minh).
+2. **Đêm 2 · Đảo Cau** (270s · 6 đèn · ≥4) — cầu tre, Gió Lạc, Bùa Gió.
+3. **Đêm 3 · Đảo Chuông** (300s · 7 đèn · ≥5) — 3 tầng, Tháp Chuông, gió mạnh.
+
+Đèn **cạn dầu** (1 fuel/s). Thắp lần đầu cần 10 đom đóm; thắp lại 5; đổ dầu khi đang cháy. Bóng Mực hút dầu đèn yếu (<30). Vùng an toàn chỉ khi fuel ≥ 30.
 
 ## Điều khiển
 
 | Phím | Hành động |
 |---|---|
-| `WASD` / mũi tên | Di chuyển (6 m/s; 7.2 m/s khi có Bùa Gió) |
-| Chuột (click khóa) | Xoay camera góc nhìn thứ ba |
-| `Space` | Nhảy (chỉ khi chạm đất) |
-| `Shift` | Lướt (Dash — 14 m/s trong 0.2s, hồi chiêu 1.5s; 0s khi có Bùa Gió) |
-| `E` | Nạp đom đóm vào Đèn Lồng Lớn gần nhất (10 đom đóm/đèn) |
-| `Q` | Tỏa sáng (Pulse — tốn 3 đom đóm, bán kính 5m, hồi chiêu 3s) |
-| `Esc` / `P` | Tạm dừng (Pause / Resume) |
+| `WASD` | Di chuyển |
+| Chuột | Xoay camera (click khóa) |
+| `Space` | Nhảy |
+| `Shift` | Lướt |
+| `E` | Thắp / thắp lại / đổ dầu |
+| `Q` | Tỏa sáng (3 đom đóm) |
+| `Esc` / `P` | Tạm dừng |
 
-## Cách tính điểm (`game.contract.json` v1.1)
+Cài đặt: **Bảng màu dễ phân biệt** (shade `#00B3FF`, cảnh báo trắng + ⚠).
 
-- `+10` mỗi đom đóm nạp vào đèn
-- `+100` mỗi Đèn Lồng Lớn được thắp sáng
-- `+5` mỗi Bóng Mực trúng Pulse
-- Khi **thắng Đêm**: `+floor(thời gian còn lại) × 2 + 50 × số Ngọn Lửa còn lại`
-- Tổng điểm là tổng điểm các Đêm đã thắng.
+## Điểm (v1.2)
 
-## Tài liệu & Bằng chứng
+- `+5` mỗi đom đóm nạp/đổ dầu
+- `+100` thắp lần đầu · `+40` thắp lại
+- `+5` Pulse thường · `+15` Pulse khi Shade đang/ vừa drain
+- Thắng bình minh: mỗi đèn sáng `+50 + ⌊fuel⌋` · mỗi Ngọn Lửa `+50`
+- Không cộng điểm theo thời gian còn lại
 
-- Harness AI: `AGENTS.md`
-- Contract v1.1: `game.contract.json`
-- Đặc tả & Acceptance Criteria Phase 2: `docs/notes/phase-2-spec.md`
-- Nhật ký AI: `docs/notes/ai-log.md`
-- Bằng chứng Phase 2: `docs/proof/phase-2/`
+Sức chứa đom đóm: `min(20, 10 + 2 × số lần thắp thành công)`.
+
+## Tài liệu
+
+- `AGENTS.md` · `game.contract.json` (v1.2)
+- ADR: `docs/adr/ADR-003-lantern-fuel-and-dawn.md`
+- Evidence: `docs/phase-3-evidence.md` · `docs/proof/phase-3/`
+- `CHANGELOG.md` · `docs/notes/ai-log.md`

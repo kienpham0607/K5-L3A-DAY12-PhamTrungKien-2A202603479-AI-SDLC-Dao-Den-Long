@@ -125,6 +125,7 @@ const hud = createHud(settings, {
     saveSettings(settings);
     audio.updateSettings(settings);
     input.setSensitivity(settings.mouseSensitivity);
+    sceneView.setColorblind(settings.colorblindPalette);
   },
   onMainMenu() {
     if (document.pointerLockElement) document.exitPointerLock();
@@ -134,6 +135,7 @@ const hud = createHud(settings, {
 });
 
 input.requestPointerLock(canvas, () => screen === 'playing');
+sceneView.setColorblind(settings.colorblindPalette);
 hud.setScreen('menu');
 
 // Unlock audio on first gesture anywhere

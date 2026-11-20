@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Đảo Đèn Lồng — Day 12 AI SDLC Phase 1",
+  "description": "Đảo Đèn Lồng — Day 12 AI SDLC Phase 3 (Đèn cạn dầu)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

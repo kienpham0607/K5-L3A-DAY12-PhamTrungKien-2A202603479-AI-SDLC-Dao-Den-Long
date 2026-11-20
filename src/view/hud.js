@@ -64,8 +64,8 @@ export function createHud(initialSettings, callbacks) {
         <div class="lock-hint" id="hud-lock-hint">Click để xoay chuột · Esc/P tạm dừng</div>
       </div>
 
-      <div class="hud-panel mote-bar-panel">
-        <span class="stat-label">Đom đóm (<span id="hud-carried-num">0</span>/10)</span>
+        <div class="hud-panel mote-bar-panel">
+        <span class="stat-label">Đom đóm (<span id="hud-carried-num">0</span>/<span id="hud-capacity">10</span>)</span>
         <div class="mote-slots" id="hud-motes"></div>
       </div>
 
@@ -179,6 +179,12 @@ export function createHud(initialSettings, callbacks) {
           <label><span>Độ nhạy chuột</span><span id="val-sens">0.16</span></label>
           <input type="range" id="set-sens" min="0.04" max="0.45" step="0.02" />
         </div>
+        <div class="setting-item setting-check">
+          <label>
+            <span>Bảng màu dễ phân biệt</span>
+            <input type="checkbox" id="set-colorblind" />
+          </label>
+        </div>
       </div>
       <button type="button" class="btn btn-primary" id="btn-settings-close">Lưu & Đóng</button>
     </div>
@@ -217,7 +223,7 @@ export function createHud(initialSettings, callbacks) {
   `;
   document.body.appendChild(resultOverlay);
 
-  // Pre-build 3 flame pips & 10 mote slots
+  // Pre-build 3 flame pips & up to capacity_max mote slots
   const flamesEl = hud.querySelector('#hud-flames');
   const flamePips = [];
   for (let i = 0; i < (TUNING.flames ?? 3); i += 1) {
@@ -229,9 +235,10 @@ export function createHud(initialSettings, callbacks) {
 
   const motesEl = hud.querySelector('#hud-motes');
   const moteSlots = [];
-  for (let i = 0; i < (TUNING.carry_capacity ?? 10); i += 1) {
+  for (let i = 0; i < (TUNING.capacity_max ?? 20); i += 1) {
     const el = document.createElement('span');
     el.className = 'mote-slot';
+    el.style.display = i < (TUNING.carry_capacity ?? 10) ? '' : 'none';
     motesEl.appendChild(el);
     moteSlots.push(el);
   }
@@ -241,6 +248,7 @@ export function createHud(initialSettings, callbacks) {
   const setMusic = settingsOverlay.querySelector('#set-music');
   const setSfx = settingsOverlay.querySelector('#set-sfx');
   const setSens = settingsOverlay.querySelector('#set-sens');
+  const setColorblind = settingsOverlay.querySelector('#set-colorblind');
   const valMaster = settingsOverlay.querySelector('#val-master');
   const valMusic = settingsOverlay.querySelector('#val-music');
   const valSfx = settingsOverlay.querySelector('#val-sfx');
@@ -251,10 +259,12 @@ export function createHud(initialSettings, callbacks) {
     setMusic.value = s.musicVolume;
     setSfx.value = s.sfxVolume;
     setSens.value = s.mouseSensitivity;
+    setColorblind.checked = Boolean(s.colorblindPalette);
     valMaster.textContent = `${Math.round(s.masterVolume * 100)}%`;
     valMusic.textContent = `${Math.round(s.musicVolume * 100)}%`;
     valSfx.textContent = `${Math.round(s.sfxVolume * 100)}%`;
     valSens.textContent = s.mouseSensitivity.toFixed(2);
+    document.body.classList.toggle('colorblind', Boolean(s.colorblindPalette));
   }
   syncSettingsUI(initialSettings);
 
@@ -264,11 +274,13 @@ export function createHud(initialSettings, callbacks) {
       musicVolume: Number(setMusic.value),
       sfxVolume: Number(setSfx.value),
       mouseSensitivity: Number(setSens.value),
+      colorblindPalette: Boolean(setColorblind.checked),
     };
     syncSettingsUI(next);
     callbacks.onSettingsChange(next);
   };
   [setMaster, setMusic, setSfx, setSens].forEach((el) => el.addEventListener('input', emitSettings));
+  setColorblind.addEventListener('change', emitSettings);
 
   // Button listeners
   menuOverlay.querySelector('#btn-play-start').addEventListener('click', () => callbacks.onSelectNight(1));
@@ -300,6 +312,7 @@ export function createHud(initialSettings, callbacks) {
     lanterns: hud.querySelector('#hud-lanterns'),
     score: hud.querySelector('#hud-score'),
     carriedNum: hud.querySelector('#hud-carried-num'),
+    capacity: hud.querySelector('#hud-capacity'),
     dashCard: hud.querySelector('#hud-dash-card'),
     dashStatus: hud.querySelector('#hud-dash-status'),
     pulseCard: hud.querySelector('#hud-pulse-card'),
@@ -474,14 +487,14 @@ export function createHud(initialSettings, callbacks) {
           : won
             ? `Thắng — ${nightName}`
             : data.reason === 'dawn'
-              ? 'Thua — Hết giờ (Bình minh)'
+              ? 'Thua — Bình minh (thiếu đèn)'
               : 'Thua — Hết Ngọn Lửa';
         els.resDesc.textContent = isDawn
-          ? 'Mây đã thắp sáng cả ba hòn đảo và đưa ánh bình minh trở lại biển mây!'
+          ? 'Mây giữ đủ đèn sáng đến bình minh và đưa ánh sáng trở lại biển mây!'
           : won
-            ? 'Mọi Đèn Lồng Lớn trên đảo đã bừng sáng. Chuẩn bị cho hòn đảo tiếp theo!'
+            ? `Giữ được ${litCount}/${w.lanterns.length} đèn đến bình minh. Chuẩn bị hòn đảo tiếp theo!`
             : data.reason === 'dawn'
-              ? 'Đã hết thời gian trước khi thắp sáng toàn bộ Đèn Lồng Lớn.'
+              ? 'Bình minh đến nhưng chưa đủ đèn sáng theo ngưỡng 60%.'
               : 'Ngọn Lửa của Mây đã tắt giữa màn đêm.';
         els.resScore.textContent = w.score.toLocaleString('vi-VN');
         els.resLanterns.textContent = `${litCount}/${w.lanterns.length}`;
@@ -503,7 +516,18 @@ export function createHud(initialSettings, callbacks) {
     handleEvents(events) {
       for (const ev of events) {
         if (ev.name === 'lantern_lit') {
-          showToast(`✦ Đèn ${ev.data.lantern_id} đã sáng! +${TUNING.score.per_lantern}`);
+          const pts = ev.data.relight ? TUNING.score.per_relight : TUNING.score.per_lantern;
+          showToast(
+            ev.data.relight
+              ? `✦ Đèn ${ev.data.lantern_id} thắp lại! +${pts}`
+              : `✦ Đèn ${ev.data.lantern_id} đã sáng! +${pts}`,
+          );
+        } else if (ev.name === 'refuel') {
+          showToast(`✦ Đổ dầu ${ev.data.lantern_id}: dầu ${ev.data.fuel}`);
+        } else if (ev.name === 'lantern_out') {
+          showToast(`⚠ Đèn ${ev.data.lantern_id} đã tắt!`, true);
+        } else if (ev.name === 'fuel_drain') {
+          showToast(`⚠ Bóng Mực đang hút dầu ${ev.data.lantern_id}!`, true);
         } else if (ev.name === 'charm_picked') {
           showToast('✦ Nhặt Bùa Gió! Tăng tốc & Lướt không hồi chiêu (10s)');
         } else if (ev.name === 'drifter_steal') {
@@ -546,17 +570,19 @@ export function createHud(initialSettings, callbacks) {
       els.charm.classList.toggle('active', charmS > 0);
       if (charmS > 0) els.charmTime.textContent = `${charmS.toFixed(1)}s`;
 
-      // Clock (mm:ss; red & blinking when <= 30s)
+      // Clock (mm:ss; red & blinking when <= 30s; ⚠ white in colorblind mode)
+      const cb = document.body.classList.contains('colorblind');
       els.nightTitle.textContent = world.level.subtitle;
-      els.clock.textContent = formatClock(timeLeftS);
+      const clockStr = formatClock(timeLeftS);
+      els.clock.textContent = timeLeftS <= 30 && cb ? `⚠ ${clockStr}` : clockStr;
       els.clock.classList.toggle('urgent', timeLeftS <= 30);
 
       // Night 3 Wind badge
       if (world.wind?.active) {
-        els.wind.textContent = 'Gió mạnh đang thổi!';
+        els.wind.textContent = cb ? '⚠ Gió mạnh đang thổi!' : 'Gió mạnh đang thổi!';
         els.wind.className = 'wind-badge visible active';
       } else if (world.wind?.warning) {
-        els.wind.textContent = 'Cảnh báo: Gió mạnh sắp tới!';
+        els.wind.textContent = cb ? '⚠ Cảnh báo: Gió mạnh sắp tới!' : 'Cảnh báo: Gió mạnh sắp tới!';
         els.wind.className = 'wind-badge visible';
       } else {
         els.wind.className = 'wind-badge';
@@ -564,12 +590,30 @@ export function createHud(initialSettings, callbacks) {
 
       // Lanterns & Score
       const litCount = world.lanterns.filter((l) => l.lit).length;
-      els.lanterns.textContent = `${litCount}/${world.lanterns.length}`;
+      const lowFuel = world.lanterns.some(
+        (l) => l.lit && l.fuelUnits < (TUNING.low_fuel_threshold ?? 30) * TICK_HZ,
+      );
+      els.lanterns.textContent = lowFuel && cb
+        ? `⚠ ${litCount}/${world.lanterns.length}`
+        : `${litCount}/${world.lanterns.length}`;
+      els.lanterns.classList.toggle('warn-low-fuel', lowFuel);
+      if (lowFuel) {
+        els.lanterns.setAttribute('title', '⚠ Có đèn dầu thấp');
+      } else {
+        els.lanterns.removeAttribute('title');
+      }
       els.score.textContent = world.score.toLocaleString('vi-VN');
 
-      // 10-slot Mote bar
+      // Dynamic capacity mote bar
+      const base = TUNING.carry_capacity ?? 10;
+      const cap = Math.min(
+        TUNING.capacity_max ?? 20,
+        base + 2 * (world.player.successful_lights ?? 0),
+      );
       els.carriedNum.textContent = String(world.player.carried);
+      els.capacity.textContent = String(cap);
       for (let i = 0; i < moteSlots.length; i += 1) {
+        moteSlots[i].style.display = i < cap ? '' : 'none';
         moteSlots[i].classList.toggle('filled', i < world.player.carried);
       }
 
@@ -600,21 +644,29 @@ export function createHud(initialSettings, callbacks) {
         els.pulseStatus.textContent = `Sẵn sàng (-${pulseCost})`;
       }
 
-      // Contextual prompt: "E — Nạp ánh sáng (x/10)"
-      let nearUnlit = null;
+      // Contextual prompt: light / relight / refuel
+      let nearLantern = null;
       let nearDist = Infinity;
-      const cost = TUNING.lantern_cost ?? 10;
+      const maxFuel = (TUNING.fuel_max ?? 100) * TICK_HZ;
       for (const l of world.lanterns) {
-        if (l.lit) continue;
+        if (l.lit && l.fuelUnits >= maxFuel) continue;
         if (Math.abs(world.player.pos[1] - l.pos[1]) > 2.2) continue;
         const d = Math.hypot(world.player.pos[0] - l.pos[0], world.player.pos[2] - l.pos[2]);
         if (d <= (TUNING.interact_radius ?? 2.0) + 0.6 && d < nearDist) {
           nearDist = d;
-          nearUnlit = l;
+          nearLantern = l;
         }
       }
-      if (world.state === 'playing' && nearUnlit) {
-        els.prompt.textContent = `E — Nạp ánh sáng (${nearUnlit.deposited}/${cost})`;
+      if (world.state === 'playing' && nearLantern) {
+        if (nearLantern.lit) {
+          const fuelDisp = Math.round((nearLantern.fuelUnits / TICK_HZ) * 10) / 10;
+          els.prompt.textContent = `E — Đổ dầu (dầu ${fuelDisp}/100)`;
+        } else {
+          const cost = nearLantern.ever_lit ? (TUNING.relight_cost ?? 5) : (TUNING.lantern_cost ?? 10);
+          els.prompt.textContent = nearLantern.ever_lit
+            ? `E — Thắp lại (${nearLantern.deposited}/${cost})`
+            : `E — Thắp đèn (${nearLantern.deposited}/${cost})`;
+        }
         els.prompt.classList.add('visible');
       } else {
         els.prompt.classList.remove('visible');

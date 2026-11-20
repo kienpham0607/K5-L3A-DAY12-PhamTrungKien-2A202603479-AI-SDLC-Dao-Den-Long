@@ -25,8 +25,8 @@ before(() => {
   mkdirSync(outDir, { recursive: true });
 });
 
-describe('T-deposit-lit (lantern_cost=10)', () => {
-  it('interact edge deposits 10 and lights L1 with +10/mote +100/lantern score', () => {
+describe('T-deposit-lit (Phase 3 scoring + fuel)', () => {
+  it('interact edge deposits 10 and lights L1 with +5/mote +100/lantern, relight:false', () => {
     const out = join(outDir, 'deposit_lit.jsonl');
     if (existsSync(out)) unlinkSync(out);
 
@@ -50,16 +50,19 @@ describe('T-deposit-lit (lantern_cost=10)', () => {
     assert.ok(lit);
     assert.equal(lit.tick, 1);
     assert.equal(lit.data.lantern_id, 'L1');
+    assert.equal(lit.data.relight, false);
 
     const snap1 = lines.find((l) => l.type === 'snapshot' && l.tick === 1);
     const l1 = snap1.lanterns.find((l) => l.id === 'L1');
     assert.equal(l1.lit, true);
-    assert.equal(l1.deposited, 10);
+    assert.equal(l1.fuel, 100);
+    assert.equal(l1.ever_lit, true);
     assert.equal(snap1.player.carried, 0);
+    assert.equal(snap1.player.capacity, 12);
     assert.equal(snap1.score, 10 * TUNING.score.per_mote + TUNING.score.per_lantern);
   });
 
-  it('partial deposit scores +10/mote and does not light', () => {
+  it('partial deposit scores +5/mote and does not light', () => {
     const out = join(outDir, 'deposit_partial.jsonl');
     const r = runCli([
       '--seed', '1',
@@ -80,7 +83,7 @@ describe('T-deposit-lit (lantern_cost=10)', () => {
     assert.equal(snap.score, dep.data.amount * TUNING.score.per_mote);
   });
 
-  it('scenario lit:true does not emit lantern_lit or score on interact', () => {
+  it('scenario lit:true full fuel does not emit lantern_lit or deposit on interact', () => {
     const out = join(outDir, 'deposit_prelit.jsonl');
     const r = runCli([
       '--seed', '1',
@@ -98,5 +101,6 @@ describe('T-deposit-lit (lantern_cost=10)', () => {
     const snap0 = lines.find((l) => l.type === 'snapshot' && l.tick === 0);
     assert.equal(snap0.score, 0);
     assert.equal(snap0.lanterns.find((l) => l.id === 'L1').lit, true);
+    assert.equal(snap0.lanterns.find((l) => l.id === 'L1').fuel, 100);
   });
 });

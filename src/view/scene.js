@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TUNING } from '../shared/tuning.js';
+import { TICK_HZ } from '../shared/constants.js';
 import { getSurfaceHeight } from '../sim/terrain.js';
 
 // Mandatory Phase 2 Color Palette (exact hex values)
@@ -18,6 +19,7 @@ export const PALETTE = {
   shadeCore: 0x120a1a,
   shadeGlow: 0x7a3cff,
   shadeMist: 0x3a3450,
+  shadeGlowCB: 0x00b3ff,
   mayRobe: 0xe8e2d0,
   mayScarf: 0xc8102e,
   gold: 0xf2c14e,
@@ -71,6 +73,8 @@ export function createScene(canvas) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.1;
+
+  let colorblindPalette = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.sky);
@@ -489,9 +493,9 @@ export function createScene(canvas) {
   playerLight.position.set(0.35, 1.6, 0.2);
   player.add(playerLight);
 
-  // Orbiting carried fireflies (up to 10)
+  // Orbiting carried fireflies (up to capacity_max = 20)
   const carriedOrbs = [];
-  for (let i = 0; i < (TUNING.carry_capacity ?? 10); i += 1) {
+  for (let i = 0; i < (TUNING.capacity_max ?? 20); i += 1) {
     const orb = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: warmGlowTex,
@@ -610,8 +614,50 @@ export function createScene(canvas) {
     const light = new THREE.PointLight(PALETTE.lanternLit, 0, 22, 1.4);
     light.position.y = 3.2;
 
-    g.add(pedestal, pole, roof, bulb, halo, safeRing, light);
-    g.userData = { bulbMat, halo, haloMat, safeRingMat, light };
+    // Fuel bar (billboard-ish group above bulb)
+    const fuelBar = new THREE.Group();
+    fuelBar.position.y = 4.35;
+    const fuelBg = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.1, 0.14),
+      new THREE.MeshBasicMaterial({ color: 0x1a1a28, transparent: true, opacity: 0.85, depthWrite: false }),
+    );
+    const fuelFillMat = new THREE.MeshBasicMaterial({
+      color: PALETTE.gold,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    });
+    const fuelFill = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.1), fuelFillMat);
+    fuelFill.position.z = 0.01;
+    fuelBar.add(fuelBg, fuelFill);
+    fuelBar.visible = false;
+
+    // Torn-paper look for unlit: irregular rim disc
+    const tearMat = new THREE.MeshStandardMaterial({
+      color: 0x8a7a6a,
+      roughness: 1,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.55,
+    });
+    const tear = new THREE.Mesh(new THREE.CircleGeometry(0.42, 5), tearMat);
+    tear.position.y = 3.18;
+    tear.rotation.y = 0.4;
+    tear.visible = false;
+
+    g.add(pedestal, pole, roof, bulb, halo, safeRing, light, fuelBar, tear);
+    g.userData = {
+      bulbMat,
+      halo,
+      haloMat,
+      safeRingMat,
+      light,
+      fuelBar,
+      fuelFill,
+      fuelFillMat,
+      tear,
+      bulb,
+    };
     scene.add(g);
     lanternMeshes.set(id, g);
     return g;
@@ -956,24 +1002,43 @@ export function createScene(canvas) {
       }
     }
 
-    // Lanterns
+    // Lanterns (fuel bars, low-fuel 1Hz flash, deflated unlit)
     const cost = TUNING.lantern_cost || 10;
+    const lowThresh = TUNING.low_fuel_threshold ?? 30;
+    const fuelMax = TUNING.fuel_max ?? 100;
     for (const l of world.lanterns) {
       const m = ensureLantern(l.id);
       m.position.set(l.pos[0], l.pos[1], l.pos[2]);
       const lit = Boolean(l.lit);
+      const fuel = lit ? l.fuelUnits / TICK_HZ : 0;
       const progress = lit ? 1 : Math.min(1, (l.deposited || 0) / cost);
       const pulse = Math.sin(t * 3.2 + l.pos[0]) * 0.1;
+      const lowFuel = lit && fuel < lowThresh; // exactly 30 does NOT flash
+      const flashOn = !lowFuel || Math.floor(t * 2) % 2 === 0; // 1 Hz
 
       if (lit) {
+        m.scale.setScalar(1);
+        m.userData.tear.visible = false;
         m.userData.bulbMat.color.setHex(PALETTE.lanternCore);
         m.userData.bulbMat.emissive.setHex(PALETTE.lanternLit);
-        m.userData.bulbMat.emissiveIntensity = 1.85 + pulse;
-        m.userData.light.intensity = 3.0 + pulse;
-        m.userData.haloMat.opacity = 0.85;
+        m.userData.bulbMat.emissiveIntensity = flashOn ? 1.85 + pulse : 0.35;
+        m.userData.light.intensity = flashOn ? 3.0 + pulse : 0.6;
+        m.userData.haloMat.opacity = flashOn ? 0.85 : 0.25;
         m.userData.halo.scale.setScalar(3.5 + pulse * 0.5);
-        m.userData.safeRingMat.opacity = 0.52 + Math.sin(t * 2) * 0.08;
+        const safe = fuel >= lowThresh;
+        m.userData.safeRingMat.opacity = safe ? 0.52 + Math.sin(t * 2) * 0.08 : 0;
+
+        m.userData.fuelBar.visible = true;
+        const ratio = Math.max(0, Math.min(1, fuel / fuelMax));
+        m.userData.fuelFill.scale.x = Math.max(0.02, ratio);
+        m.userData.fuelFill.position.x = -0.5 * (1 - ratio);
+        m.userData.fuelFillMat.color.setHex(lowFuel ? PALETTE.danger : PALETTE.gold);
+        m.userData.fuelFillMat.opacity = flashOn ? 0.95 : 0.25;
+        m.userData.fuelBar.lookAt(camera.position);
       } else if (progress > 0) {
+        m.scale.setScalar(0.92);
+        m.userData.tear.visible = true;
+        m.userData.fuelBar.visible = false;
         m.userData.bulbMat.color.setHex(PALETTE.sand);
         m.userData.bulbMat.emissive.setHex(PALETTE.lanternLit);
         m.userData.bulbMat.emissiveIntensity = 0.35 + progress * 0.8;
@@ -982,12 +1047,16 @@ export function createScene(canvas) {
         m.userData.halo.scale.setScalar(2.0 + progress * 0.7);
         m.userData.safeRingMat.opacity = 0;
       } else {
+        // Unlit: 20% deflated + torn paper cue
+        m.scale.setScalar(0.8);
+        m.userData.tear.visible = true;
+        m.userData.fuelBar.visible = false;
         m.userData.bulbMat.color.setHex(PALETTE.lanternOff);
-        m.userData.bulbMat.emissive.setHex(PALETTE.lanternLit);
-        m.userData.bulbMat.emissiveIntensity = 0.06;
-        m.userData.light.intensity = 0.1;
-        m.userData.haloMat.opacity = 0.14;
-        m.userData.halo.scale.setScalar(1.5);
+        m.userData.bulbMat.emissive.setHex(0x3a3040);
+        m.userData.bulbMat.emissiveIntensity = 0.02;
+        m.userData.light.intensity = 0.05;
+        m.userData.haloMat.opacity = 0.08;
+        m.userData.halo.scale.setScalar(1.2);
         m.userData.safeRingMat.opacity = 0;
       }
     }
@@ -1026,12 +1095,15 @@ export function createScene(canvas) {
         shadeMeshes.set(s.id, mesh);
       }
       const stunned = s.state === 'stunned';
+      const draining = s.state === 'drain';
+      const eyeHex = colorblindPalette ? PALETTE.shadeGlowCB : PALETTE.shadeGlow;
       mesh.position.set(s.pos[0], s.pos[1] + Math.sin(t * 4.2 + s.pos[0]) * 0.1, s.pos[2]);
       mesh.visible = true;
       mesh.rotation.y = Math.atan2(p.pos[0] - s.pos[0], p.pos[2] - s.pos[2]);
-      mesh.userData.body.rotation.y = t * (stunned ? 0.5 : 2.2);
-      mesh.userData.bodyMat.emissiveIntensity = stunned ? 0.15 : 0.62;
-      mesh.userData.eyeMat.color.setHex(stunned ? PALETTE.lanternOff : PALETTE.shadeGlow);
+      mesh.userData.body.rotation.y = t * (stunned ? 0.5 : draining ? 0.8 : 2.2);
+      mesh.userData.bodyMat.emissiveIntensity = stunned ? 0.15 : draining ? 0.9 : 0.62;
+      mesh.userData.bodyMat.emissive.setHex(colorblindPalette ? PALETTE.shadeGlowCB : PALETTE.shadeGlow);
+      mesh.userData.eyeMat.color.setHex(stunned ? PALETTE.lanternOff : eyeHex);
       mesh.userData.stunRing.visible = stunned;
       if (stunned) mesh.userData.stunRing.rotation.z = t * 5;
     }
@@ -1192,6 +1264,9 @@ export function createScene(canvas) {
     updateCamera,
     handleEvents,
     getOffscreenLanternIndicator,
+    setColorblind(enabled) {
+      colorblindPalette = Boolean(enabled);
+    },
     player,
   };
 }

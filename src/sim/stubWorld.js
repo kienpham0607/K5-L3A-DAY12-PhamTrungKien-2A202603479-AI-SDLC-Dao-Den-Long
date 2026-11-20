@@ -1,5 +1,5 @@
 /**
- * World state creation, scenario override application, and Contract v1.1 serialization.
+ * World state creation, scenario override application, and Contract v1.2 serialization.
  * Pure JS — no Three.js / DOM dependencies.
  */
 import { TUNING } from '../shared/tuning.js';
@@ -7,6 +7,8 @@ import { TICK_HZ } from '../shared/constants.js';
 import { getLevel } from '../shared/levels.js';
 import { round3, round3Vec3 } from './math.js';
 import { createRng } from './rng.js';
+import { fuelMaxUnits, exportFuel } from './systems/fuel.js';
+import { playerCapacity } from './systems/deposit.js';
 
 export class FormatError extends Error {
   constructor(message) {
@@ -19,6 +21,44 @@ export class FormatError extends Error {
 function assertVec3(name, v) {
   if (!Array.isArray(v) || v.length !== 3 || v.some((n) => typeof n !== 'number' || Number.isNaN(n))) {
     throw new FormatError(`${name} must be [x,y,z] numbers`);
+  }
+}
+
+function makeLantern(l) {
+  return {
+    id: l.id,
+    pos: [...l.pos],
+    lit: false,
+    deposited: 0,
+    fuelUnits: 0,
+    ever_lit: false,
+    relit_count: 0,
+    _justGainedSafety: false,
+  };
+}
+
+function applyLanternLitDefaults(lantern, patch, tuning = TUNING) {
+  if (patch.lit !== undefined) lantern.lit = Boolean(patch.lit);
+  if (patch.ever_lit !== undefined) lantern.ever_lit = Boolean(patch.ever_lit);
+  if (patch.deposited !== undefined) {
+    if (typeof patch.deposited !== 'number') throw new FormatError('deposited must be number');
+    lantern.deposited = patch.deposited;
+  }
+  if (patch.relit_count !== undefined) {
+    lantern.relit_count = Math.max(0, Math.round(patch.relit_count));
+  }
+  if (patch.fuel !== undefined) {
+    if (typeof patch.fuel !== 'number') throw new FormatError('fuel must be number');
+    lantern.fuelUnits = Math.round(patch.fuel * TICK_HZ);
+  } else if (lantern.lit && patch.fuel === undefined && lantern.fuelUnits === 0) {
+    // lit:true without fuel → default 100
+    lantern.fuelUnits = fuelMaxUnits(tuning);
+  }
+  if (lantern.lit) {
+    if (!lantern.ever_lit) lantern.ever_lit = true;
+    if (lantern.fuelUnits <= 0) lantern.fuelUnits = fuelMaxUnits(tuning);
+  } else {
+    lantern.fuelUnits = 0;
   }
 }
 
@@ -48,6 +88,7 @@ export function createDefaultWorld(night = 1, seed = 0) {
       grounded: true,
       carried: 0,
       flames: TUNING.flames,
+      successful_lights: 0,
       invulnTicks: 0,
       dashTicks: 0,
       dashDir: [0, 1],
@@ -58,12 +99,7 @@ export function createDefaultWorld(night = 1, seed = 0) {
       fallingHandled: false,
       respawnTicks: 0,
     },
-    lanterns: level.lanterns.map((l) => ({
-      id: l.id,
-      pos: [...l.pos],
-      lit: false,
-      deposited: 0,
-    })),
+    lanterns: level.lanterns.map((l) => makeLantern(l)),
     motes: [],
     shades: [],
     drifters: [],
@@ -84,16 +120,13 @@ export function createDefaultWorld(night = 1, seed = 0) {
   };
 }
 
-/**
- * Re-seed world RNG deterministically (call after changing seed).
- */
 export function reseedWorld(world, seed) {
   world.seed = seed;
   world.rng = createRng(seed * 997 + world.night * 31 + 1);
 }
 
 /**
- * Apply scenario overrides without emitting events or scoring (Contract D / v1.1).
+ * Apply scenario overrides without emitting events or scoring (Contract D / v1.2).
  */
 export function applyScenario(world, scenario) {
   if (scenario == null) return world;
@@ -126,6 +159,12 @@ export function applyScenario(world, scenario) {
     if (sp.flames !== undefined) {
       if (typeof sp.flames !== 'number') throw new FormatError('player.flames must be number');
       world.player.flames = sp.flames;
+    }
+    if (sp.successful_lights !== undefined) {
+      if (typeof sp.successful_lights !== 'number') {
+        throw new FormatError('player.successful_lights must be number');
+      }
+      world.player.successful_lights = Math.max(0, Math.round(sp.successful_lights));
     }
     if (sp.invuln !== undefined) {
       world.player.invulnTicks = sp.invuln ? TUNING.invuln_ticks : 0;
@@ -197,6 +236,9 @@ export function applyScenario(world, scenario) {
         inSafePush: false,
         wanderAngle: 0,
         wanderTimer: 0,
+        targetLanternId: s.target_lantern_id ?? null,
+        drainEmitTicks: 0,
+        wasDraining: s.state === 'drain',
       };
     });
     world._nextShadeId = world.shades.length + 1;
@@ -243,18 +285,14 @@ export function applyScenario(world, scenario) {
       }
       let lantern = world.lanterns.find((l) => l.id === patch.id);
       if (!lantern) {
-        lantern = { id: patch.id, pos: [0, 0, 0], lit: false, deposited: 0 };
+        lantern = makeLantern({ id: patch.id, pos: patch.pos || [0, 0, 0] });
         world.lanterns.push(lantern);
       }
       if (patch.pos !== undefined) {
         assertVec3(`lantern ${patch.id}.pos`, patch.pos);
         lantern.pos = [...patch.pos];
       }
-      if (patch.deposited !== undefined) {
-        if (typeof patch.deposited !== 'number') throw new FormatError('deposited must be number');
-        lantern.deposited = patch.deposited;
-      }
-      if (patch.lit !== undefined) lantern.lit = Boolean(patch.lit);
+      applyLanternLitDefaults(lantern, patch, TUNING);
     }
   }
 
@@ -298,6 +336,8 @@ export function serializeSnapshot(world, tick) {
       grounded: Boolean(p.grounded),
       flames: p.flames,
       carried: p.carried,
+      capacity: playerCapacity(world, TUNING),
+      successful_lights: p.successful_lights ?? 0,
       invuln: p.invulnTicks > 0,
       dash_cd_s: round3(p.dashCdTicks / TICK_HZ),
       pulse_cd_s: round3(p.pulseCdTicks / TICK_HZ),
@@ -308,6 +348,9 @@ export function serializeSnapshot(world, tick) {
       pos: round3Vec3(l.pos),
       lit: Boolean(l.lit),
       deposited: l.deposited,
+      fuel: exportFuel(l),
+      ever_lit: Boolean(l.ever_lit),
+      relit_count: l.relit_count ?? 0,
     })),
     motes: world.motes
       .filter((m) => m.active)
@@ -320,6 +363,7 @@ export function serializeSnapshot(world, tick) {
       id: s.id,
       pos: round3Vec3(s.pos),
       state: s.state,
+      target_lantern_id: s.targetLanternId ?? null,
     })),
     drifters: world.drifters
       .filter((d) => d.state !== 'removed')

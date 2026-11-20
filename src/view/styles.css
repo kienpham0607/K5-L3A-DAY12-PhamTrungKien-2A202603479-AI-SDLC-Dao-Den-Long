@@ -585,6 +585,37 @@ kbd {
   color: var(--gold);
 }
 
+.metric-val.warn-low-fuel {
+  color: var(--danger, #ff5a5f);
+  animation: blinkDanger 1s ease-in-out infinite;
+}
+
+body.colorblind .clock-display.urgent,
+body.colorblind .metric-val.warn-low-fuel,
+body.colorblind .wind-badge,
+body.colorblind .wind-badge.active,
+body.colorblind #hud-toast.danger {
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+}
+
+.setting-check label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-ui);
+}
+
+.setting-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--lantern-lit);
+}
+
 @media (max-width: 780px) {
   .radar-wrap, .hud-bottom-left { display: none; }
   .hud-bottom { grid-template-columns: 1fr auto; }

@@ -1,5 +1,16 @@
 # Nhật ký sử dụng AI — Day 12
 
+## Session 14 — Kiểm tra & hoàn thiện Phase 3 (TICKET-03 "Đèn cạn dầu" + Test Contract v1.2)
+
+| Mục | Nội dung |
+|---|---|
+| Thời điểm | 2026-11-20 |
+| Công cụ | Antigravity Agent |
+| Mục tiêu | Audit toàn diện Phase 3 theo TICKET-03 & Contract v1.2, sửa các edge-case/thiếu sót còn lại, chạy lại test + production build và hoàn tất DoD |
+| Phát hiện & sửa | 1) **Bug `safeZones.js`**: Shade đang ở trạng thái `drain` khi đèn được châm dầu lên `>= 30` bị `inSafePush = true` nhưng giữ nguyên `state = 'drain'` nên vẫn hút 5 fuel/s ở step 2 tick kế tiếp → sửa chuyển ngay sang `wander` + xóa `targetLanternId` khi bị đẩy ra vùng an toàn; bổ sung unit test xác minh. 2) **Colorblind mode (`styles.css` + `hud.js`)**: đồng hồ khẩn cấp `<= 30s` và cảnh báo gió chưa đổi sang `#FFFFFF` + biểu tượng `⚠` khi bật "Bảng màu dễ phân biệt" → đã bổ sung đầy đủ. 3) **View (`scene.js`)**: số đom đóm bay quanh Mây mới tạo sẵn 10 hạt thay vì `capacity_max = 20` → đã nâng lên 20. 4) **Docs**: cập nhật `docs/notes/ai-log.md` và `docs/phase-3-evidence.md` theo đúng DoD của `AGENTS.md` |
+| Kết quả chạy thật | `npm test`: **82/82 PASS** (28 suites). `npm run build`: PASS |
+| Bằng chứng | `docs/adr/ADR-003-lantern-fuel-and-dawn.md`, `CHANGELOG.md`, `docs/phase-3-evidence.md`, `docs/proof/phase-3/*` |
+
 ## Session 12 — Hoàn thành Phase 2 (TICKET-02 "Ba hòn đảo" + Test Contract v1.1)
 
 | Mục | Nội dung |
@@ -153,6 +164,16 @@
 | Token/chi phí ước tính | 1 phiên scaffold vừa; tiết kiệm: stub-only, chưa Three.js scene |
 | AI sai? | Không phát hiện trong bước này. PowerShell redirect stderr ồn — dùng spawn Node để ghi proof sạch |
 | Chưa làm (đúng scope) | Movement, pickup, deposit, shades, pulse, win/lose gameplay, Three.js view |
+
+## Session 12 — Phase 3 TICKET-03 "Đèn cạn dầu" (Contract v1.2)
+
+| Mục | Nội dung |
+|---|---|
+| Mục tiêu | Fuel/relight/refuel, Shade drain, dawn win, capacity, scoring, view, tests, ADR, evidence |
+| Thay đổi chính | `fuel.js`, deposit/shades/safeZones/winlose/pulse/pickup/step/stubWorld, tuning+contract v1.2, HUD/scene/settings, tests Phase 3 |
+| Chạy thật | `npm test` → **81 pass / 0 fail**; `npm run build` OK; proof JSONL trong `docs/proof/phase-3/` |
+| Docs | `ADR-003`, `CHANGELOG.md`, `docs/phase-3-evidence.md`, cập nhật README/AGENTS |
+| AI sai? | Không — mọi assertion dựa trên output máy; không bịa screenshot |
 
 ## Mẫu ghi tiếp (mỗi lần dùng AI)
 
